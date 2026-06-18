@@ -1,0 +1,977 @@
+{
+  "schema_version": "enriched_metadata_v2",
+  "description": "Enriched metadata output of the MMS Parser (Enricher). Designed to train AI agents for airline MRO operations.",
+  "source": "horizon_airlines/_pre_planning_togaf/",
+  "enricher": {
+    "input": "raw_metadata.json (from database extractor)",
+    "process": "6-stage enrichment pipeline: name_enrichment → domain_mapping → relationship_discovery → glossary_compliance → usecase_process_gen → decision_alert_gen",
+    "output": "this file (enriched_metadata.json)",
+    "key_fields_added": ["feature", "reason", "key_processes", "endpoints", "definitions", "use_cases"]
+  },
+  "entity_types": [
+    {
+      "type": "enriched_table",
+      "description": "One per database table. Adds business context: what feature it supports, why it exists, which endpoints hit it, what processes use it.",
+      "fields": [
+        {"name": "entity_id", "required": true, "description": "Unique identifier"},
+        {"name": "source_table", "required": true, "description": "Physical table name in source database"},
+        {"name": "source_schema", "required": true, "description": "Database schema"},
+        {"name": "source_database", "required": true, "description": "Source database type (postgresql, cosmos, oracle, etc.)"},
+        {"name": "business_name", "required": true, "description": "Human-readable table name"},
+        {"name": "business_description", "required": true, "description": "Plain-English explanation of what this table holds"},
+        {"name": "feature", "required": true, "description": "Which MMS business feature this table supports (from mro_features.json)"},
+        {"name": "reason", "required": true, "description": "Why this table exists — the business justification / why the airline needs this data"},
+        {"name": "domain", "required": true, "description": "TOGAF business domain (e.g. Fleet Management, Maintenance Execution, Inventory, Compliance, Workforce, Analytics)"},
+        {"name": "data_criticality", "required": true, "enum": ["safety_critical", "business_critical", "operational", "reference"]},
+        {"name": "regulatory_significance", "required": false, "description": "EASA/FAA/ICAO regulations that mandate or govern this table"},
+        {"name": "stakeholders", "required": false, "description": "Roles that use this data"},
+        {"name": "key_processes", "required": true, "description": "Business processes this table enables (e.g. Aircraft Induction, Check Scheduling, CRS Issuance, Lease Return)"},
+        {"name": "endpoints", "required": true, "description": "API endpoints that read/write this table"},
+        {"name": "columns", "required": true, "description": "Array of enriched_column objects"},
+        {"name": "primary_key", "required": true},
+        {"name": "foreign_key_relationships", "required": true, "description": "FK links to other tables with business meaning"},
+        {"name": "sample_agent_queries", "required": false, "description": "Questions an agent might ask + the SQL to answer them"}
+      ]
+    },
+    {
+      "type": "enriched_column",
+      "description": "One per column. Adds business meaning, enum expansions, sensitivity, and agent behavior notes.",
+      "fields": [
+        {"name": "column_name", "required": true},
+        {"name": "business_name", "required": true},
+        {"name": "description", "required": true, "description": "What this column means in business terms"},
+        {"name": "reason", "required": true, "description": "Why this column is captured — what operational or regulatory need it serves"},
+        {"name": "data_type", "required": true},
+        {"name": "primary_key", "required": false},
+        {"name": "is_pii", "required": false},
+        {"name": "is_safety_critical", "required": false, "description": "If true, this field carries safety implications for airworthiness"},
+        {"name": "sensitivity", "required": false, "enum": ["public", "internal", "confidential", "restricted"]},
+        {"name": "enum_values", "required": false, "description": "If enum, list all values with their business meaning"},
+        {"name": "data_quality_rules", "required": false},
+        {"name": "agent_notes", "required": false, "description": "Guidance to AI agent on how to interpret or use this column"}
+      ]
+    },
+    {
+      "type": "enriched_relationship",
+      "description": "Foreign key and implicit business relationships between tables.",
+      "fields": [
+        {"name": "source_table", "required": true},
+        {"name": "source_column", "required": true},
+        {"name": "target_table", "required": true},
+        {"name": "target_column", "required": true},
+        {"name": "relationship_type", "required": true, "enum": ["one_to_one", "one_to_many", "many_to_one", "many_to_many"]},
+        {"name": "business_meaning", "required": true, "description": "What this relationship means in the real world (e.g. 'An aircraft has multiple maintenance visits over its lifetime')"}
+      ]
+    },
+    {
+      "type": "enriched_endpoint",
+      "description": "One per API endpoint. Maps to features, tables, business rules, and authorization requirements.",
+      "fields": [
+        {"name": "entity_id", "required": true},
+        {"name": "http_method", "required": true},
+        {"name": "endpoint_path", "required": true},
+        {"name": "business_name", "required": true},
+        {"name": "description", "required": true},
+        {"name": "use_case", "required": true, "description": "When and why someone calls this endpoint"},
+        {"name": "feature", "required": true, "description": "Which MMS feature this endpoint implements"},
+        {"name": "reason", "required": true, "description": "Why this endpoint exists — the business or regulatory need it fulfills"},
+        {"name": "related_tables", "required": true, "description": "Which database tables this endpoint reads or writes"},
+        {"name": "auth_required", "required": true},
+        {"name": "roles_allowed", "required": true},
+        {"name": "business_rules", "required": false, "description": "Validation rules and business logic enforced at this endpoint"},
+        {"name": "side_effects", "required": false, "description": "What else changes when this endpoint is called (e.g. status updates)"},
+        {"name": "agent_notes", "required": false, "description": "Guidance to AI agent on how to handle this endpoint"}
+      ]
+    },
+    {
+      "type": "enriched_process",
+      "description": "End-to-end business process that spans tables and endpoints.",
+      "fields": [
+        {"name": "entity_id", "required": true},
+        {"name": "process_name", "required": true},
+        {"name": "process_description", "required": true},
+        {"name": "feature", "required": true, "description": "Which MMS feature this process belongs to"},
+        {"name": "reason", "required": true, "description": "Why this process exists — the operational or regulatory driver"},
+        {"name": "steps", "required": true, "description": "Ordered steps, each with system_actions (endpoint calls), performed_by (roles), and business_rules"},
+        {"name": "related_tables", "required": true},
+        {"name": "related_endpoints", "required": true},
+        {"name": "kpi_metrics", "required": false},
+        {"name": "trigger_conditions", "required": false},
+        {"name": "completion_conditions", "required": false}
+      ]
+    },
+    {
+      "type": "enriched_glossary",
+      "description": "Domain-specific terms, acronyms, regulatory references. The agent must know these to speak the airline's language.",
+      "fields": [
+        {"name": "term", "required": true},
+        {"name": "acronym_of", "required": false},
+        {"name": "definition", "required": true},
+        {"name": "category", "required": true, "enum": ["Status", "Document", "Component", "Regulatory", "Process", "Role", "Metric"]},
+        {"name": "synonyms", "required": false},
+        {"name": "regulatory_reference", "required": false},
+        {"name": "reason", "required": true, "description": "Why this concept matters in airline MRO"},
+        {"name": "agent_notes", "required": false, "description": "Behavioral guidance for AI agent when this term is encountered"}
+      ]
+    },
+    {
+      "type": "enriched_usecase",
+      "description": "Concrete business scenario the agent will be asked to handle.",
+      "fields": [
+        {"name": "use_case_id", "required": true},
+        {"name": "use_case_name", "required": true},
+        {"name": "description", "required": true},
+        {"name": "feature", "required": true, "description": "Which MMS feature this use case supports"},
+        {"name": "reason", "required": true, "description": "Why this use case is important to the airline"},
+        {"name": "actors", "required": true},
+        {"name": "trigger", "required": true},
+        {"name": "steps", "required": true},
+        {"name": "related_endpoints", "required": true},
+        {"name": "related_tables", "required": true},
+        {"name": "business_rules", "required": false},
+        {"name": "success_condition", "required": false},
+        {"name": "escalation_condition", "required": false},
+        {"name": "agent_training_notes", "required": false}
+      ]
+    }
+  ],
+  "example_data": {
+    "tables": [
+      {
+        "entity_id": "tab_aircraft",
+        "entity_type": "enriched_table",
+        "source_table": "aircraft",
+        "source_schema": "public",
+        "source_database": "postgresql",
+        "business_name": "Aircraft Fleet Register",
+        "business_description": "Master record of every aircraft in the airline's fleet. One row per tail number. Contains identity, model assignment, current operational status, ownership type (owned/leased), and current base station.",
+        "feature": {
+          "function_name": "Aircraft Maintenance Planning & Scheduling",
+          "feature_name": "Maintenance Visit Forecasting Engine",
+          "description": "Project next due dates for scheduled checks based on projected fleet utilization, seasonality, and historical turnaround patterns",
+          "reason": "Enables long-term hangar slot booking, labor resource allocation, and lease return condition planning months in advance"
+        },
+        "reason": "The aircraft table is the root entity of the entire MMS. Every maintenance visit, task card, defect record, compliance entry, and inventory movement traces back to a specific aircraft. Without this table, no maintenance work can be planned, executed, or recorded.",
+        "domain": "Fleet Management",
+        "subdomain": "Aircraft Configuration",
+        "data_criticality": "safety_critical",
+        "regulatory_significance": ["EASA Part M.A.201 - Airworthiness review", "FAA Part 121.153 - Aircraft registration and eligibility", "ICAO Annex 6 Part I - Operation of aircraft"],
+        "stakeholders": ["Fleet Manager", "CAMO Engineer", "Flight Operations", "Technical Records", "Maintenance Controller"],
+        "key_processes": [
+          "Aircraft Induction - Adding a new aircraft to the fleet register",
+          "Maintenance Visit Planning - Scheduling checks against an aircraft",
+          "Fleet Status Monitoring - Real-time view of airworthiness across the fleet",
+          "Lease Return - Managing end-of-lease maintenance obligations",
+          "AOG Response - Emergency escalation when aircraft goes AOG"
+        ],
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/aircraft",
+            "purpose": "List all aircraft with filters (status, model, station)",
+            "use_case": "Operations center views fleet status at a glance"
+          },
+          {
+            "method": "GET",
+            "path": "/aircraft/{aircraftId}",
+            "purpose": "Get full aircraft details including engines and active defects",
+            "use_case": "Dispatcher checks airworthiness before scheduling flight"
+          },
+          {
+            "method": "GET",
+            "path": "/aircraft/{aircraftId}/status",
+            "purpose": "Get aircraft airworthiness status (is_airworthy, blocking_items)",
+            "use_case": "Flight ops system polls whether aircraft can dispatch"
+          }
+        ],
+        "columns": [
+          {
+            "entity_id": "col_aircraft_id",
+            "entity_type": "enriched_column",
+            "column_name": "aircraft_id",
+            "business_name": "Aircraft Identifier",
+            "description": "System-generated UUID. Internal key used for all foreign key references across the database. Not displayed to users.",
+            "reason": "Provides a stable, immutable identifier for the aircraft regardless of tail number changes (re-registrations happen during lease transfers). All 37 other tables reference this ID for relational integrity.",
+            "data_type": "uuid",
+            "primary_key": true,
+            "is_pii": false,
+            "is_safety_critical": false,
+            "sensitivity": "internal",
+            "agent_notes": "Use for JOINs only. Never display to users. Use tail_number for human-facing responses."
+          },
+          {
+            "entity_id": "col_tail_number",
+            "entity_type": "enriched_column",
+            "column_name": "tail_number",
+            "business_name": "Tail Number / Registration",
+            "description": "Aircraft registration mark displayed on the fuselage. Format: 2-letter country prefix + 3-4 alphanumeric characters. Example: G-EZAT (UK), N123AB (USA), D-AIBC (Germany), VT-XXX (India).",
+            "reason": "The tail number is the universal identifier used by pilots, ATC, ground handlers, and regulators. It links the physical aircraft to its digital record. Required on all regulatory documentation.",
+            "data_type": "varchar(10)",
+            "primary_key": false,
+            "is_pii": false,
+            "is_safety_critical": false,
+            "sensitivity": "public",
+            "data_quality_rules": ["UNIQUE constraint enforced", "NOT NULL", "Format validation: ^[A-Z]-[A-Z0-9]{3,6}$"],
+            "agent_notes": "Primary human-readable identifier. Use in all user-facing responses. Example: 'G-EZAT is an A320-251N based at LGW.'"
+          },
+          {
+            "entity_id": "col_aircraft_status",
+            "entity_type": "enriched_column",
+            "column_name": "status",
+            "business_name": "Operational Status",
+            "description": "Current airworthiness and availability state of the entire aircraft. Drives whether the aircraft can be dispatched for commercial service.",
+            "reason": "This is the single most important operational field. It determines flight dispatch legality, insurance coverage, and hangar slot allocation. AOG status triggers airline-wide emergency protocols.",
+            "data_type": "varchar(20)",
+            "primary_key": false,
+            "is_pii": false,
+            "is_safety_critical": true,
+            "sensitivity": "internal",
+            "enum_values": [
+              {"value": "ACTIVE", "meaning": "Flying or available for flight. All maintenance current, CRS valid. Dispatch OK.", "dispatch_ok": true},
+              {"value": "MAINTENANCE", "meaning": "In hangar for scheduled/unscheduled work. Not available. Dispatch NOT OK.", "dispatch_ok": false},
+              {"value": "AOG", "meaning": "Aircraft on Ground — technical issue prevents flight. Emergency status. Highest priority for all departments. Dispatch NOT OK.", "dispatch_ok": false},
+              {"value": "STORED", "meaning": "Long-term storage/preservation. Requires reactivation checks. Dispatch NOT OK.", "dispatch_ok": false},
+              {"value": "RETIRED", "meaning": "Permanently removed from service. Dispatch NOT OK.", "dispatch_ok": false}
+            ],
+            "agent_notes": "CRITICAL: Before answering any 'can this aircraft fly' question, check this field. If status != ACTIVE, the answer is NO. AOG is a declared emergency — escalate immediately."
+          },
+          {
+            "entity_id": "col_manufacturer_serial",
+            "entity_type": "enriched_column",
+            "column_name": "manufacturer_serial_number",
+            "business_name": "MSN (Manufacturer Serial Number)",
+            "description": "OEM-assigned serial number unique to the airframe. Set at final assembly and never changes for the life of the aircraft.",
+            "reason": "Required for regulatory tracking, AD applicability checking (by MSN range), lease return condition verification, and accident investigation. Unlike tail_number, MSN never changes.",
+            "data_type": "varchar(30)",
+            "primary_key": false,
+            "is_safety_critical": false,
+            "data_quality_rules": ["UNIQUE", "Read-only after aircraft induction"]
+          }
+        ],
+        "primary_key": ["aircraft_id"],
+        "foreign_key_relationships": [
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "model_id",
+            "target_table": "aircraft_model",
+            "target_column": "model_id",
+            "relationship_type": "many_to_one",
+            "business_meaning": "An aircraft has exactly one model definition (A320-251N, B737-8, etc). The model determines which maintenance program applies, which parts are compatible, and which mechanic type ratings are required."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "current_station_id",
+            "target_table": "station",
+            "target_column": "station_id",
+            "relationship_type": "many_to_one",
+            "business_meaning": "The airport/base where the aircraft is currently positioned. Changes daily based on flight schedule."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "aircraft_id",
+            "target_table": "maintenance_visit",
+            "target_column": "aircraft_id",
+            "relationship_type": "one_to_many",
+            "business_meaning": "An aircraft has many maintenance visits over its lifetime. The active visit (status IN_PROGRESS) tells you where the aircraft is right now."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "aircraft_id",
+            "target_table": "life_limited_part",
+            "target_column": "aircraft_id",
+            "relationship_type": "one_to_many",
+            "business_meaning": "An aircraft has many life-limited parts installed. Each LLP tracks its own remaining life."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "aircraft_id",
+            "target_table": "deferred_defect",
+            "target_column": "aircraft_id",
+            "relationship_type": "one_to_many",
+            "business_meaning": "An aircraft can have multiple deferred (MEL) defects active simultaneously."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "ownership_type",
+            "target_table": "lease_agreement",
+            "target_column": "agreement_id",
+            "relationship_type": "optional_one_to_one",
+            "business_meaning": "If leased, links to the lease agreement which governs return conditions, maintenance obligations, and redelivery milestones."
+          }
+        ],
+        "sample_agent_queries": [
+          {"question": "How many aircraft are currently AOG?", "sql": "SELECT COUNT(*) FROM aircraft WHERE status = 'AOG'"},
+          {"question": "Show me all A320-family aircraft and their current status", "sql": "SELECT a.tail_number, a.status, m.model_name FROM aircraft a JOIN aircraft_model m ON a.model_id = m.model_id WHERE m.model_name LIKE 'A320%'"},
+          {"question": "Which aircraft are due for C-check in the next 30 days?", "sql": "SELECT a.tail_number, mv.planned_start_date, mv.visit_reference FROM aircraft a JOIN maintenance_visit mv ON a.aircraft_id = mv.aircraft_id WHERE mv.check_type = 'C_CHECK' AND mv.status IN ('PLANNED','CONFIRMED') AND mv.planned_start_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days' ORDER BY mv.planned_start_date"},
+          {"question": "What is the current lease status of G-EZAT?", "sql": "SELECT a.tail_number, l.lessor_name, l.start_date, l.end_date, l.return_conditions FROM aircraft a JOIN lease_agreement l ON a.aircraft_id = l.aircraft_id WHERE a.tail_number = 'G-EZAT'"}
+        ]
+      },
+      {
+        "entity_id": "tab_maintenance_visit",
+        "entity_type": "enriched_table",
+        "source_table": "maintenance_visit",
+        "source_schema": "public",
+        "source_database": "postgresql",
+        "business_name": "Maintenance Visit Record",
+        "business_description": "Each row represents one scheduled or unscheduled maintenance visit for an aircraft. Captures the full lifecycle: planned → confirmed → in_progress → completed. Links the aircraft, check package, station, all task cards, and the resulting Certificate of Release to Service.",
+        "feature": {
+          "function_name": "Aircraft Maintenance Planning & Scheduling",
+          "feature_name": "Maintenance Program Check Management",
+          "description": "Define and manage A/B/C/D check packages, interval triggers (flight hours, cycles, calendar), and task scope per aircraft model and variant",
+          "reason": "Ensures each aircraft adheres to manufacturer-approved maintenance programs and prevents unscheduled groundings"
+        },
+        "reason": "The maintenance visit is the central organizing entity for all maintenance execution. It packages hundreds of task cards into a single operation, tracks cost and labor at the visit level, and produces the CRS that proves airworthiness. Without visits, maintenance would be unmanaged and untraceable.",
+        "domain": "Maintenance Execution",
+        "subdomain": "Visit Management",
+        "data_criticality": "safety_critical",
+        "regulatory_significance": ["EASA Part 145.A.50 - Maintenance records and release", "FAA Part 43.9 - Content of maintenance records"],
+        "stakeholders": ["Maintenance Planner", "Hangar Supervisor", "CAMO Engineer", "Quality Manager", "Accountant"],
+        "key_processes": [
+          "Check Scheduling - Creating planned visits based on interval forecasts",
+          "Visit Execution - Managing the hangar operation from induction to sign-off",
+          "CRS Generation - Issuing the legal certificate that returns the aircraft to service",
+          "Maintenance Cost Accrual - Tracking labor hours, parts consumed, and vendor costs per visit",
+          "Lease Return Preparation - Ensuring all visit records are complete for redelivery"
+        ],
+        "endpoints": [
+          {"method": "GET", "path": "/visits", "purpose": "List all visits with filters (aircraft, status, check type, date range)"},
+          {"method": "POST", "path": "/visits", "purpose": "Create a new visit. Auto-generates task cards from the check package."},
+          {"method": "GET", "path": "/visits/{visitId}", "purpose": "Get visit details including task card status, findings, and CRS reference"},
+          {"method": "POST", "path": "/visits/{visitId}/start", "purpose": "Start the visit. Aircraft enters hangar. Status changes to IN_PROGRESS."},
+          {"method": "POST", "path": "/visits/{visitId}/complete", "purpose": "Complete the visit. All tasks done, CRS issued. Status changes to COMPLETED."},
+          {"method": "GET", "path": "/visits/{visitId}/task-cards", "purpose": "Get all task cards for this visit with status per card"}
+        ],
+        "columns": [
+          {
+            "entity_id": "col_visit_ref",
+            "entity_type": "enriched_column",
+            "column_name": "visit_reference",
+            "business_name": "Visit Reference Number",
+            "description": "Human-readable reference code. Format: MV-2026-0001 (MV = Maintenance Visit, year, sequential number). Used on all physical documentation, hangar whiteboards, and communication.",
+            "reason": "Provides a human-friendly identifier for the visit that mechanics, planners, and auditors can reference without UUIDs. Essential for cross-department communication and hangar floor operations.",
+            "data_type": "varchar(20)",
+            "is_safety_critical": false,
+            "agent_notes": "Use this reference when communicating with users about a visit. Example: 'MV-2026-0142 is the C-check on G-EZAT currently in progress at LGW hangar 3.'"
+          },
+          {
+            "entity_id": "col_check_type",
+            "entity_type": "enriched_column",
+            "column_name": "check_type",
+            "business_name": "Check Type",
+            "description": "Classification of the maintenance check being performed. Determines the scope, duration, cost, and resource requirements for the visit.",
+            "reason": "Check type is the primary driver of resource planning. C-checks need hangar space for 2 weeks and 3000+ man-hours. A-checks can be done overnight. Misclassifying a check causes cascading scheduling failures.",
+            "data_type": "varchar(20)",
+            "is_safety_critical": false,
+            "enum_values": [
+              {"value": "A_CHECK", "meaning": "Light check every 500-800 flight hours. Overnight or 1-2 days. ~50 man-hours.", "typical_duration_days": "1-2"},
+              {"value": "B_CHECK", "meaning": "Intermediate check. Usually absorbed into A-check scope. ~150 man-hours.", "typical_duration_days": "1-3"},
+              {"value": "C_CHECK", "meaning": "Heavy check every 18-24 months. ~3000 man-hours. Requires dedicated hangar bay.", "typical_duration_days": "10-14"},
+              {"value": "D_CHECK", "meaning": "Heaviest check every 6-10 years. Full strip and structural inspection. ~50000 man-hours.", "typical_duration_days": "42-56"},
+              {"value": "PHASED", "meaning": "C-check tasks split across multiple A-check slots to minimize downtime. Common in low-cost carriers.", "typical_duration_days": "Multiple A-slots"},
+              {"value": "UNSCHEDULED", "meaning": "Emergency or defect-driven. No standard duration or scope.", "typical_duration_days": "Variable"}
+            ],
+            "agent_notes": "Check type drives everything: cost estimate, hangar booking duration, parts kitting, and mechanic scheduling. A D_CHECK cannot be done in an overnight slot. C_CHECK in 3 days means a phased approach is needed."
+          },
+          {
+            "entity_id": "col_visit_status",
+            "entity_type": "enriched_column",
+            "column_name": "status",
+            "business_name": "Visit Status",
+            "description": "Current stage in the visit lifecycle. Controls what actions are allowed and what data is visible.",
+            "reason": "Status enforces the maintenance workflow. You cannot generate a CRS until status is COMPLETED. You cannot start a visit that is still PLANNED. Status prevents out-of-sequence operations that could compromise airworthiness records.",
+            "data_type": "varchar(20)",
+            "is_safety_critical": false,
+            "enum_values": [
+              {"value": "PLANNED", "meaning": "Visit created in system with planned dates. No physical work. Can be rescheduled."},
+              {"value": "CONFIRMED", "meaning": "Hangar slot locked, resources committed, aircraft confirmed for input date."},
+              {"value": "IN_PROGRESS", "meaning": "Aircraft in hangar. Task cards being executed. Status changes cost tracking."},
+              {"value": "COMPLETED", "meaning": "All task cards done/def erred. CRS issued. Aircraft returned to service."},
+              {"value": "CANCELLED", "meaning": "Visit cancelled before work started. Slots freed for other use."}
+            ],
+            "agent_notes": "Only COMPLETED visits have a valid CRS. An IN_PROGRESS visit means the aircraft is unavailable. If someone asks 'when will the aircraft be ready?', check the visit status and actual progress."
+          }
+        ],
+        "primary_key": ["visit_id"],
+        "foreign_key_relationships": [
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "aircraft_id",
+            "target_table": "aircraft",
+            "target_column": "aircraft_id",
+            "relationship_type": "many_to_one",
+            "business_meaning": "Each visit is for exactly one aircraft. An aircraft has many visits over its lifetime."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "check_package_id",
+            "target_table": "check_package",
+            "target_column": "package_id",
+            "relationship_type": "many_to_one",
+            "business_meaning": "Each visit follows a specific check package that defines the task scope."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "visit_id",
+            "target_table": "task_card",
+            "target_column": "visit_id",
+            "relationship_type": "one_to_many",
+            "business_meaning": "A visit has many task cards (one per maintenance task in the package). Each task card tracks a single mechanic's work."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "visit_id",
+            "target_table": "certificate_release",
+            "target_column": "visit_id",
+            "relationship_type": "one_to_one",
+            "business_meaning": "A completed visit generates exactly one CRS. The CRS is the legal output of the visit."
+          }
+        ],
+        "sample_agent_queries": [
+          {"question": "Which aircraft are currently in the hangar for maintenance?", "sql": "SELECT a.tail_number, mv.visit_reference, mv.check_type, mv.planned_end_date FROM maintenance_visit mv JOIN aircraft a ON mv.aircraft_id = a.aircraft_id WHERE mv.status = 'IN_PROGRESS' ORDER BY mv.planned_end_date"},
+          {"question": "How many C-checks are scheduled for next quarter?", "sql": "SELECT COUNT(*) FROM maintenance_visit WHERE check_type = 'C_CHECK' AND status IN ('PLANNED','CONFIRMED') AND planned_start_date BETWEEN date_trunc('quarter', CURRENT_DATE) AND date_trunc('quarter', CURRENT_DATE + INTERVAL '3 months')"},
+          {"question": "What is the average turnaround time for C-checks this year?", "sql": "SELECT AVG(actual_end_date - actual_start_date) AS avg_days FROM maintenance_visit WHERE check_type = 'C_CHECK' AND status = 'COMPLETED' AND EXTRACT(YEAR FROM actual_start_date) = EXTRACT(YEAR FROM CURRENT_DATE)"},
+          {"question": "Show me overdue maintenance visits", "sql": "SELECT mv.visit_reference, a.tail_number, mv.check_type, mv.planned_end_date, mv.actual_end_date FROM maintenance_visit mv JOIN aircraft a ON mv.aircraft_id = a.aircraft_id WHERE mv.status = 'IN_PROGRESS' AND mv.planned_end_date < CURRENT_DATE ORDER BY mv.planned_end_date"}
+        ]
+      },
+      {
+        "entity_id": "tab_life_limited_part",
+        "entity_type": "enriched_table",
+        "source_table": "life_limited_part",
+        "source_schema": "public",
+        "source_database": "postgresql",
+        "business_name": "Life-Limited Part Register",
+        "business_description": "Tracks every life-limited component (LLP) by serial number. Each row represents one physical part instance installed on an aircraft or in storage. Records total life limit (in cycles, hours, or calendar), remaining life, and installation/removal history.",
+        "feature": {
+          "function_name": "Reliability & Airworthiness Monitoring",
+          "feature_name": "Life-Limited Part Monitoring",
+          "description": "Track parts with fixed life limits by serial number, monitor remaining hours/cycles/calendar time, and enforce removal before expiry",
+          "reason": "Prevents catastrophic failures and ensures full traceability for regulatory audits and asset resale value"
+        },
+        "reason": "LLPs have hard mandatory life limits imposed by the OEM and regulator. Exceeding an LLP limit can cause catastrophic in-flight failure (e.g. uncontained engine failure, landing gear collapse). This table ensures parts are removed before limits expire, and provides the audit trail required by EASA Part 21 and FAA Part 39 for every LLP on every aircraft.",
+        "domain": "Reliability & Airworthiness",
+        "subdomain": "Component Life Management",
+        "data_criticality": "safety_critical",
+        "regulatory_significance": ["EASA Part 21.A.307 - Life-limited parts", "FAA Part 39.7 - Airworthiness Directives", "ICAO Annex 8 - Airworthiness of aircraft"],
+        "stakeholders": ["Component Engineer", "Reliability Engineer", "CAMO Engineer", "Maintenance Planner"],
+        "key_processes": [
+          "LLP Installation - Recording a new or overhauled LLP installed on an aircraft",
+          "Life Consumption Tracking - Automatically decrementing remaining life based on flight utilization",
+          "LLP Removal Alerting - Warning at 50%, 90%, and 100% of life consumed",
+          "Shop Visit Coordination - Sending LLP for overhaul before limit expires",
+          "Component Retirement - Removing LLP from service permanently at end of life"
+        ],
+        "endpoints": [
+          {"method": "GET", "path": "/reliability/llp", "purpose": "List all LLPs with filters (aircraft, status, threshold alert)"},
+          {"method": "GET", "path": "/reliability/llp/{llpId}/forecast", "purpose": "Get replacement forecast showing when this LLP will hit its limit"}
+        ],
+        "columns": [
+          {
+            "entity_id": "col_llp_serial",
+            "entity_type": "enriched_column",
+            "column_name": "part_serial_number",
+            "business_name": "Part Serial Number",
+            "description": "OEM-stamped serial number unique to this physical part instance. Used for traceability from manufacture through every installation and removal.",
+            "reason": "Serial number is the key to back-to-birth traceability. Every LLP has a unique identity that must be tracked from the OEM production line to final retirement. Regulators require full traceability for accident investigation.",
+            "data_type": "varchar(30)",
+            "is_safety_critical": true,
+            "data_quality_rules": ["UNIQUE across all LLPs", "NOT NULL", "Read-only after first installation"]
+          },
+          {
+            "entity_id": "col_llp_remaining_life",
+            "entity_type": "enriched_column",
+            "column_name": "remaining_life",
+            "business_name": "Remaining Life",
+            "description": "Computed value showing remaining flight cycles, flight hours, or calendar days before the part must be removed. Unit varies by part type.",
+            "reason": "This is the critical decision field. When remaining_life reaches zero, the part is expired and the aircraft is grounded. Proactive planning requires knowing remaining life at all times to schedule removals before expiry.",
+            "data_type": "integer",
+            "is_safety_critical": true,
+            "agent_notes": "CRITICAL: If remaining_life <= 0, the part is EXPIRED. The aircraft cannot fly until replaced. Check this field before answering any question about aircraft availability."
+          },
+          {
+            "entity_id": "col_llp_total_life",
+            "entity_type": "enriched_column",
+            "column_name": "total_life_limit",
+            "business_name": "Total Life Limit",
+            "description": "Maximum permitted life before mandatory removal. Set by the OEM and approved by the regulator. Never changes for a given part type.",
+            "reason": "The total life limit is the regulatory maximum. Part type certification specifies this value. It cannot be extended without re-certification.",
+            "data_type": "integer",
+            "is_safety_critical": true
+          },
+          {
+            "entity_id": "col_llp_threshold_pct",
+            "entity_type": "enriched_column",
+            "column_name": "life_consumed_pct",
+            "business_name": "Life Consumed Percentage",
+            "description": "Generated column: ((total_life_limit - remaining_life) / total_life_limit) * 100. Used for threshold alerting.",
+            "reason": "Percentage provides a normalized view across different LLP types with different life limits. Enables consistent alerting at 50%, 90%, and 100% thresholds regardless of whether the unit is cycles, hours, or days.",
+            "data_type": "decimal(5,2)",
+            "is_safety_critical": true
+          }
+        ],
+        "primary_key": ["llp_id"],
+        "foreign_key_relationships": [
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "aircraft_id",
+            "target_table": "aircraft",
+            "target_column": "aircraft_id",
+            "relationship_type": "many_to_one",
+            "business_meaning": "Each LLP is installed on one aircraft at a time. Over its lifetime, an LLP may move between aircraft (but this is rare)."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "part_master_id",
+            "target_table": "part_master",
+            "target_column": "part_id",
+            "relationship_type": "many_to_one",
+            "business_meaning": "Each LLP is an instance of a part type defined in the part master catalog."
+          }
+        ],
+        "sample_agent_queries": [
+          {"question": "Which LLPs are approaching their life limit (over 90% consumed)?", "sql": "SELECT llp.part_serial_number, p.part_number, p.part_name, llp.remaining_life, llp.total_life_limit, ((llp.total_life_limit - llp.remaining_life)::decimal / llp.total_life_limit) * 100 AS pct_consumed, a.tail_number FROM life_limited_part llp JOIN part_master p ON llp.part_master_id = p.part_id JOIN aircraft a ON llp.aircraft_id = a.aircraft_id WHERE ((llp.total_life_limit - llp.remaining_life)::decimal / llp.total_life_limit) * 100 >= 90 ORDER BY pct_consumed DESC"},
+          {"question": "Are there any expired LLPs on active aircraft?", "sql": "SELECT a.tail_number, llp.part_serial_number, p.part_number FROM life_limited_part llp JOIN aircraft a ON llp.aircraft_id = a.aircraft_id JOIN part_master p ON llp.part_master_id = p.part_id WHERE llp.remaining_life <= 0 AND a.status = 'ACTIVE'"},
+          {"question": "When does the HPT blade on engine 1 of G-EZAT need replacement?", "sql": "SELECT llp.part_serial_number, llp.remaining_life, llp.total_life_limit FROM life_limited_part llp JOIN aircraft a ON llp.aircraft_id = a.aircraft_id JOIN part_master p ON llp.part_master_id = p.part_id WHERE a.tail_number = 'G-EZAT' AND p.part_number LIKE '%HPT-BLADE%' AND llp.installation_position = 'ENG1'"}
+        ]
+      },
+      {
+        "entity_id": "tab_rotable_component",
+        "entity_type": "enriched_table",
+        "source_table": "rotable_component",
+        "source_schema": "public",
+        "source_database": "postgresql",
+        "business_name": "Rotable Component Pool",
+        "business_description": "Tracks every serialized high-value rotable component (e.g. landing gear, actuators, pumps, avionics boxes) through its lifecycle. Each row represents one physical component with its current status, location, installation history, repair history, and pool allocation.",
+        "feature": {
+          "function_name": "Component & Inventory Control",
+          "feature_name": "Rotable & Repairable Pool Management",
+          "description": "Track serialized high-value components through their lifecycle with pool allocation, repair history, and current location across the network",
+          "reason": "Rotables represent the majority of MRO inventory capital; optimized pool management reduces spare asset investment and prevents stockouts"
+        },
+        "reason": "Rotable components are high-value ($50K-$2M each) items that are repaired rather than discarded. The airline must maintain a pool of serviceable spares to swap when a component fails. Without this table, the airline cannot locate spares, track repair turnaround times, or optimize pool size — leading to either AOG delays or excessive capital tied up in spare inventory.",
+        "domain": "Inventory & Supply Chain",
+        "subdomain": "Rotable Management",
+        "data_criticality": "business_critical",
+        "stakeholders": ["Inventory Controller", "Supply Chain Manager", "Component Engineer", "Maintenance Controller"],
+        "key_processes": [
+          "Component Removal - Recording a component removed from an aircraft",
+          "Component Installation - Recording a component installed on an aircraft (with traceability)",
+          "Repair Order Management - Sending unserviceable components to repair shops",
+          "Pool Rebalancing - Moving spares between stations to match demand",
+          "Cannibalization - Removing a serviceable component from one aircraft to fix another (requires approval)"
+        ],
+        "endpoints": [
+          {"method": "GET", "path": "/inventory/rotables", "purpose": "List rotable components with filters (part, status, station, serial)"},
+          {"method": "GET", "path": "/inventory/rotables/{componentId}", "purpose": "Get component details with full removal/installation/repair history"},
+          {"method": "POST", "path": "/inventory/rotables/{componentId}/move", "purpose": "Move component between stations (for pool rebalancing)"},
+          {"method": "GET", "path": "/inventory/pools", "purpose": "Get pool allocation across all stations"},
+          {"method": "POST", "path": "/inventory/pools/rebalance", "purpose": "Trigger optimization to redistribute spares based on demand forecast"}
+        ],
+        "columns": [
+          {
+            "entity_id": "col_rotable_serial",
+            "entity_type": "enriched_column",
+            "column_name": "serial_number",
+            "business_name": "Component Serial Number",
+            "description": "OEM serial number. Unique identifier for this physical component across its entire service life.",
+            "reason": "Essential for back-to-birth traceability. Each installation and removal must reference the serial number to maintain the component history. Regulatory requirement for accident investigation and warranty claims.",
+            "data_type": "varchar(30)",
+            "is_safety_critical": false
+          },
+          {
+            "entity_id": "col_rotable_status",
+            "entity_type": "enriched_column",
+            "column_name": "status",
+            "business_name": "Component Status",
+            "description": "Current condition and availability of the component.",
+            "reason": "Status drives all inventory decisions: serviceable items can be installed, unserviceable items need repair orders, and quarantined items need inspection.",
+            "data_type": "varchar(20)",
+            "enum_values": [
+              {"value": "SERVICEABLE", "meaning": "Ready for installation. Has valid release certificate. Available in pool."},
+              {"value": "UNSERVICEABLE", "meaning": "Failed or removed due to defect. Needs repair before return to pool."},
+              {"value": "IN_REPAIR", "meaning": "At external repair shop. Tracked via repair_order."},
+              {"value": "QUARANTINED", "meaning": "Suspected defect. Awaiting inspection. Not available for use."},
+              {"value": "INSTALLED_ON_AC", "meaning": "Currently installed on an aircraft."},
+              {"value": "SCRAPPED", "meaning": "Beyond economical repair. Permanently removed from pool."}
+            ],
+            "agent_notes": "When checking parts availability, only SERVICEABLE status items are usable. INSTALLED_ON_AC items are in use. IN_REPAIR items have uncertain return dates."
+          }
+        ],
+        "primary_key": ["component_id"],
+        "foreign_key_relationships": [
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "current_aircraft_id",
+            "target_table": "aircraft",
+            "target_column": "aircraft_id",
+            "relationship_type": "many_to_one",
+            "business_meaning": "If installed, the component is on this aircraft. Null if in pool storage."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "current_station_id",
+            "target_table": "station",
+            "target_column": "station_id",
+            "relationship_type": "many_to_one",
+            "business_meaning": "The physical location of the component (hangar, warehouse, or station store)."
+          },
+          {
+            "entity_type": "enriched_relationship",
+            "source_column": "part_master_id",
+            "target_table": "part_master",
+            "target_column": "part_id",
+            "relationship_type": "many_to_one",
+            "business_meaning": "The part type definition including interchangeability and substitutability rules."
+          }
+        ],
+        "sample_agent_queries": [
+          {"question": "Do we have a serviceable IDG for the A320 at LGW?", "sql": "SELECT rc.serial_number, rc.current_station_id FROM rotable_component rc JOIN part_master p ON rc.part_master_id = p.part_id JOIN station s ON rc.current_station_id = s.station_id WHERE p.part_name LIKE '%IDG%' AND p.aircraft_model LIKE '%A320%' AND rc.status = 'SERVICEABLE' AND s.station_code = 'LGW'"},
+          {"question": "How many serviceable spares do we have for part number 1234567?", "sql": "SELECT COUNT(*) FROM rotable_component WHERE part_master_id = (SELECT part_id FROM part_master WHERE part_number = '1234567') AND status = 'SERVICEABLE'"},
+          {"question": "Show me the full installation history of component serial ABC123", "sql": "SELECT ch.event_date, ch.event_type, ch.aircraft_id, a.tail_number, ch.remarks FROM component_history ch JOIN aircraft a ON ch.aircraft_id = a.aircraft_id WHERE ch.component_serial = 'ABC123' ORDER BY ch.event_date DESC"}
+        ]
+      }
+    ],
+    "endpoints": [
+      {
+        "entity_id": "ep_visits_create",
+        "entity_type": "enriched_endpoint",
+        "http_method": "POST",
+        "endpoint_path": "/visits",
+        "business_name": "Create Maintenance Visit",
+        "description": "Creates a new scheduled or unscheduled maintenance visit for an aircraft. Validates aircraft is in ACTIVE status, the check package applies to the aircraft model, and no overlapping visits exist. On success, auto-generates task cards from the check package and sets aircraft status to MAINTENANCE.",
+        "use_case": "Planner schedules a C-check for an aircraft approaching its interval limit, or MCC creates an unscheduled visit when an AOG is declared.",
+        "feature": {
+          "function_name": "Aircraft Maintenance Planning & Scheduling",
+          "feature_name": "Maintenance Program Check Management",
+          "description": "Define and manage A/B/C/D check packages, interval triggers, and task scope per aircraft model",
+          "reason": "Ensures each aircraft adheres to manufacturer-approved maintenance programs and prevents unscheduled groundings"
+        },
+        "reason": "This endpoint is the gateway to all maintenance execution. Every hour of hangar work, every mechanic assignment, every part consumed, and every CRS issued starts with a visit created here. It enforces business rules that prevent conflicting schedules and incompatible maintenance scopes.",
+        "related_tables": ["maintenance_visit (INSERT)", "task_card (batch INSERT)", "aircraft (UPDATE status)"],
+        "auth_required": true,
+        "roles_allowed": ["PLANNER", "MANAGER", "ADMIN"],
+        "business_rules": [
+          "aircraft.status must be ACTIVE to schedule a visit",
+          "check_package.model_id must match aircraft.model_id (package must be designed for this model)",
+          "No overlapping visits for the same aircraft (dates must not conflict)",
+          "planned_end_date must be after planned_start_date",
+          "SCHEDULED visits require a check_package_id; UNSCHEDULED visits are created without one"
+        ],
+        "side_effects": [
+          "Aircraft status changes from ACTIVE to MAINTENANCE",
+          "N task cards created (one per task in the selected check package)",
+          "Hangar slot consumed for the planned duration",
+          "Event logged to Cosmos DB audit trail"
+        ],
+        "agent_notes": "This is usually the first step in any maintenance story. When creating a visit, the agent must ensure: (1) the aircraft is actually ACTIVE, (2) the package is correct for the model, (3) there is no scheduling conflict. A 409 CONFLICT response means one of these rules failed."
+      },
+      {
+        "entity_id": "ep_crs_generate",
+        "entity_type": "enriched_endpoint",
+        "http_method": "POST",
+        "endpoint_path": "/records/crs/generate",
+        "business_name": "Generate Certificate of Release to Service",
+        "description": "Creates the legal document certifying that all maintenance work has been completed to approved standards and the aircraft is fit for flight. Includes certifying staff identity, scope statement, and digital signature. The CRS is registered in the aircraft's digital logbook.",
+        "use_case": "After a C-check is completed and all task cards are signed off, the certifying engineer generates the CRS to return the aircraft to revenue service.",
+        "feature": {
+          "function_name": "Technical Records & Documentation",
+          "feature_name": "Maintenance Release & Certificate Generation",
+          "description": "Generate certificates of release to service with authorized signatory validation, digital stamping, and automatic linkage to completed task records",
+          "reason": "The CRS is the legal document permitting flight after maintenance; invalid or missing certificates ground the aircraft"
+        },
+        "reason": "The CRS is the single most important legal document in aircraft maintenance. Without it, the aircraft cannot fly. It proves to the regulator, the airline, and the public that maintenance was performed competently and completely. Every CRS must be signed by properly authorized certifying staff.",
+        "related_tables": ["certificate_release (INSERT)", "maintenance_visit (read status, update CRS reference)", "task_card (read completion status)"],
+        "auth_required": true,
+        "roles_allowed": ["CERTIFYING_STAFF", "MANAGER", "ADMIN"],
+        "business_rules": [
+          "All task cards for the visit must be COMPLETED or DEFERRED",
+          "No open defects classified as GROUNDING on this aircraft",
+          "Certifying staff must hold valid EASA Part 66 or FAA A&P license with type rating for this model",
+          "Certifying staff cannot sign for work they personally performed (independence rule)",
+          "CRS must be generated before the visit can be marked COMPLETED"
+        ],
+        "side_effects": [
+          "Certificate stored in Cosmos DB maintenance-documents container",
+          "Visit status remains COMPLETED after CRS issuance",
+          "Aircraft status returns to ACTIVE",
+          "Logbook entry created recording the CRS reference",
+          "Event logged to Cosmos DB audit trail for regulatory review"
+        ],
+        "agent_notes": "CRITICAL: The CRS is legal permission to fly. Before generating, the agent MUST verify: (1) all task cards are closed, (2) the certifier holds valid type rating, (3) the certifier didn't do the work themselves. A 422 UNPROCESSABLE ENTITY response means the visit has open items."
+      },
+      {
+        "entity_id": "ep_defects_create",
+        "entity_type": "enriched_endpoint",
+        "http_method": "POST",
+        "endpoint_path": "/reliability/defects",
+        "business_name": "Create Deferred Defect (MEL Item)",
+        "description": "Records a deferred defect against an aircraft under MEL (Minimum Equipment List) provisions. Specifies the MEL reference, category (A/B/C/D), operational restrictions, and expiry date. The defect remains active until rectified or expired.",
+        "use_case": "A night-stop mechanic finds an INOP seat actuator. The MEL allows dispatch for 10 days (Category C). The mechanic creates a deferred defect, and the MCC schedules rectification within the limit.",
+        "feature": {
+          "function_name": "Reliability & Airworthiness Monitoring",
+          "feature_name": "Deferred Defect Management",
+          "description": "Manage minimum equipment list items with categorization, expiry tracking, operational restrictions, and rectification workflow",
+          "reason": "Allows continued safe operation with inoperative non-critical equipment while ensuring defects are fixed within permitted timeframes"
+        },
+        "reason": "Aircraft have thousands of systems. Not every defect grounds the aircraft — the MEL provides a regulated framework to defer non-critical items. This endpoint ensures every deferral is documented, categorized by urgency, and tracked to resolution. Without it, defects would be managed informally and exceed regulatory time limits.",
+        "related_tables": ["deferred_defect (INSERT)", "aircraft (read status)"],
+        "auth_required": true,
+        "roles_allowed": ["MECHANIC", "INSPECTOR", "MANAGER", "ADMIN"],
+        "business_rules": [
+          "Defect must reference a valid MEL item number from the MMEL",
+          "MEL category (A/B/C/D) determines maximum deferral duration",
+          "Category A defects cannot be extended beyond initial limit",
+          "Operational restrictions must be documented (e.g. 'Seat 14F must remain empty')",
+          "Cannot defer a defect that affects a safety-critical system (flight controls, engines, landing gear)",
+          "Aircraft can dispatch with active defects ONLY if status remains ACTIVE"
+        ],
+        "agent_notes": "Deferred defects are normal in airline operations, but each has a ticking clock. The agent MUST track expiry dates and alert before they lapse. MEL Category A = urgent (fix in days). Category D = can wait until next check."
+      }
+    ],
+    "processes": [
+      {
+        "entity_id": "proc_c_check_execution",
+        "entity_type": "enriched_process",
+        "process_name": "C-Check Execution",
+        "process_description": "End-to-end process for performing a C-check on an aircraft, from hangar induction through task execution and final CRS issuance. The airline's most resource-intensive maintenance event.",
+        "feature": {
+          "function_name": "Aircraft Maintenance Planning & Scheduling",
+          "feature_name": "Maintenance Program Check Management",
+          "description": "Define and manage A/B/C/D check packages, interval triggers, and task scope per aircraft model and variant",
+          "reason": "Ensures each aircraft adheres to manufacturer-approved maintenance programs and prevents unscheduled groundings"
+        },
+        "reason": "The C-check is the airline's most expensive scheduled maintenance event ($500K average, 2 weeks duration, 3000+ man-hours). It represents the highest maintenance cost per aircraft per year. Efficient execution directly impacts fleet availability and operating cost.",
+        "steps": [
+          {
+            "step_number": 1,
+            "step_name": "Aircraft Induction",
+            "description": "Aircraft taxis into hangar at scheduled time. Fuel defueling, systems depressurization, safety locks applied. Initial walk-around inspection by lead mechanic.",
+            "system_actions": ["POST /visits/{visitId}/start", "aircraft.status updated to MAINTENANCE"],
+            "estimated_hours": 4,
+            "performed_by": ["Lead Mechanic"]
+          },
+          {
+            "step_number": 2,
+            "step_name": "Task Card Assignment",
+            "description": "Hangar supervisor assigns each task card to a qualified mechanic based on certifications, recency, and workload.",
+            "system_actions": ["POST /planning/task-cards/{taskCardId}/assign"],
+            "estimated_hours": 2,
+            "performed_by": ["Hangar Supervisor"],
+            "business_rules": ["Mechanic must hold valid type rating for this aircraft model", "Mechanic must be current (< 90 days since last same-task sign-off)"]
+          },
+          {
+            "step_number": 3,
+            "step_name": "Task Execution",
+            "description": "Mechanics perform assigned maintenance tasks following approved data (AMM, CMM, IPC). Findings (unexpected defects) are documented and flagged for inspector review.",
+            "system_actions": ["POST /planning/task-cards/{taskCardId}/start", "POST /planning/task-cards/{taskCardId}/complete", "POST /planning/task-cards/{taskCardId}/defer"],
+            "estimated_hours": 2800,
+            "performed_by": ["Mechanics", "Inspectors"]
+          },
+          {
+            "step_number": 4,
+            "step_name": "Inspector Sign-Off",
+            "description": "Independent inspector reviews all findings and signs off critical tasks. Required for flight controls, landing gear, engines, and any task with a finding.",
+            "system_actions": ["POST /planning/task-cards/{taskCardId}/inspector-sign-off"],
+            "estimated_hours": 80,
+            "performed_by": ["Quality Inspector"],
+            "business_rules": ["Inspector cannot sign for work they performed", "Inspector must hold higher authorization level than the mechanic"]
+          },
+          {
+            "step_number": 5,
+            "step_name": "Final Inspection & Ground Test",
+            "description": "Aircraft systems test (hydraulics, pneumatics, electrics). Engine dry crank and wet run. Flight control full deflection checks. All panels closed and secured.",
+            "system_actions": [],
+            "estimated_hours": 16,
+            "performed_by": ["Lead Inspector", "Certifying Staff"]
+          },
+          {
+            "step_number": 6,
+            "step_name": "CRS Issuance & Aircraft Release",
+            "description": "Certifying staff reviews all completed work, verifies nothing is outstanding, and issues the Certificate of Release to Service. Aircraft exits hangar and returns to service.",
+            "system_actions": ["POST /records/crs/generate", "POST /visits/{visitId}/complete", "aircraft.status updated to ACTIVE"],
+            "estimated_hours": 2,
+            "performed_by": ["Certifying Staff"],
+            "business_rules": ["All task cards COMPLETED or DEFERRED", "All findings dispositioned by inspector", "Certifier holds valid EASA Part 66 license with type rating"]
+          }
+        ],
+        "related_tables": ["aircraft", "maintenance_visit", "task_card", "check_package", "maintenance_task", "certificate_release", "life_limited_part", "rotable_component"],
+        "related_endpoints": ["POST /visits/{id}/start", "POST /planning/task-cards/{id}/assign", "POST /planning/task-cards/{id}/start", "POST /planning/task-cards/{id}/complete", "POST /planning/task-cards/{id}/inspector-sign-off", "POST /records/crs/generate", "POST /visits/{id}/complete"],
+        "trigger_conditions": ["Aircraft reaches C-check interval (flight hours, cycles, or calendar threshold)", "Maintenance visit status changed to CONFIRMED"],
+        "completion_conditions": ["CRS generated successfully (POST /records/crs/generate returns 201)", "Visit status changed to COMPLETED", "Aircraft status returned to ACTIVE"],
+        "kpi_metrics": [
+          {"metric": "TAT (Turnaround Time)", "target": "14 days", "description": "Total days from induction to CRS issuance"},
+          {"metric": "Schedule Adherence", "target": "> 90%", "description": "Percentage of visits completing on or before planned end date"},
+          {"metric": "Finding Rate", "target": "< 5%", "description": "Percentage of task cards with unexpected findings (high = poor pre-check condition assessment)"},
+          {"metric": "First-Time Pass Rate", "target": "> 95%", "description": "Inspector approval on first review without rework"}
+        ]
+      }
+    ],
+    "glossary": [
+      {
+        "entity_id": "gls_aog",
+        "entity_type": "enriched_glossary",
+        "term": "AOG",
+        "acronym_of": "Aircraft On Ground",
+        "definition": "An emergency status indicating an aircraft is unable to fly due to a technical defect. Triggers highest-priority escalation: dedicated AOG desk, priority parts sourcing, management notification, and 24/7 resolution effort.",
+        "category": "Status",
+        "synonyms": ["Grounded aircraft", "Technical delay", "Aircraft unserviceable"],
+        "regulatory_reference": "IATA AOG Definition",
+        "reason": "AOG is the most urgent operational state in aviation. Every hour of AOG costs $10K-$150K in lost revenue, passenger disruption, and recovery costs. Airlines have dedicated AOG desks and procedures that bypass all normal processes.",
+        "agent_notes": "If someone says 'AOG', the agent must respond with urgency. This is NOT a routine query. Ask: which aircraft, what part is needed, where is the aircraft. Escalate if no resolution within 2 hours."
+      },
+      {
+        "entity_id": "gls_crs",
+        "entity_type": "enriched_glossary",
+        "term": "CRS",
+        "acronym_of": "Certificate of Release to Service",
+        "definition": "A legal document, signed by authorized certifying staff, confirming that maintenance has been performed correctly, using approved data and serviceable parts, and that the aircraft or component is fit for service. EASA Form 1 or FAA Form 8130-3.",
+        "category": "Document",
+        "synonyms": ["EASA Form 1", "FAA 8130-3", "Release to service", "Maintenance release"],
+        "regulatory_reference": ["EASA Part 145.A.50 - Maintenance records", "FAA Part 43.9 - Content of maintenance records", "EASA Part M.A.801 - Aircraft release to service"],
+        "reason": "The CRS is the legal permission to fly. Without it, no aircraft can depart after maintenance. The CRS is the final output of every maintenance visit and the proof of airworthiness that regulators and lessors demand.",
+        "agent_notes": "CRITICAL CONCEPT: The agent must understand that generating a CRS is a legally binding act with consequences. Never suggest generating a CRS unless all maintenance is actually complete. If someone asks 'can the aircraft fly?', check if there's a valid CRS for the last maintenance visit."
+      },
+      {
+        "entity_id": "gls_mel",
+        "entity_type": "enriched_glossary",
+        "term": "MEL",
+        "acronym_of": "Minimum Equipment List",
+        "definition": "A regulatory-approved document that permits an aircraft to operate with specific items of equipment inoperative for a defined period. Each MEL item has a repair category (A, B, C, or D) that determines the maximum time before rectification is required.",
+        "category": "Regulatory",
+        "synonyms": ["Dispatch deviation", "MEL item", "Deferred defect", "MMEL (Master MEL)"],
+        "regulatory_reference": ["EASA Part M.A.201(g) - MEL", "FAA Part 91.213 - Inoperative equipment", "ICAO Annex 6 Part I Section 4"],
+        "reason": "No aircraft is 100% serviceable at all times. The MEL provides a safe, regulated framework for dispatching aircraft with known defects. It balances operational necessity against safety by imposing strict time limits and operational restrictions per defect.",
+        "agent_notes": "MEL category determines urgency: A=fixed at gate in days, B=fixed at station in days, C=fixed within 10-120 days, D=fixed at next check. The agent must know the category and track the deadline. EXPIRED MEL items ground the aircraft."
+      },
+      {
+        "entity_id": "gls_llp",
+        "entity_type": "enriched_glossary",
+        "term": "LLP",
+        "acronym_of": "Life-Limited Part",
+        "definition": "A component with a mandatory maximum operating life (in flight cycles, flight hours, or calendar time) set by the OEM and approved by the regulator. The part must be permanently removed from service upon reaching its limit, regardless of its physical condition.",
+        "category": "Component",
+        "synonyms": ["Hard-time part", "Life-limited item", "LLP", "Life-limited component"],
+        "regulatory_reference": ["EASA Part 21.A.307 - Life-limited parts", "FAA Part 39.7 - Airworthiness Directives", "ICAO Annex 8 - Airworthiness"],
+        "reason": "LLP failures can be catastrophic: uncontained engine failure, landing gear collapse, rotor burst. These parts are life-limited because material fatigue is inevitable and non-detectable by inspection. Exceeding the limit is both a regulatory violation and a safety hazard that can cause fatalities.",
+        "agent_notes": "Zero tolerance on LLP limits. If remaining_life <= 0, the aircraft is grounded. No exceptions, no extensions. Period. If a user asks 'can we fly just one more cycle?', the answer is NO."
+      },
+      {
+        "entity_id": "gls_ad",
+        "entity_type": "enriched_glossary",
+        "term": "AD",
+        "acronym_of": "Airworthiness Directive",
+        "definition": "A legally enforceable regulation issued by the aviation authority (EASA, FAA, etc.) requiring a specific inspection, modification, or inspection on an aircraft or component. ADs are mandatory and have compliance deadlines.",
+        "category": "Regulatory",
+        "synonyms": ["Mandatory directive", "Airworthiness Directive", "AD note"],
+        "regulatory_reference": ["EASA Part 39 - Airworthiness Directives", "FAA Part 39 - Airworthiness Directives"],
+        "reason": "ADs are how regulators enforce safety fixes across the fleet. An AD may require a one-time inspection, a repetitive check, or a permanent modification. Missing an AD deadline is a regulatory violation that grounds the aircraft.",
+        "agent_notes": "ADs are not optional. If an aircraft has an overdue AD, it cannot fly. The agent should proactively check AD compliance when discussing aircraft status."
+      }
+    ],
+    "use_cases": [
+      {
+        "entity_id": "uc_aog_parts_sourcing",
+        "entity_type": "enriched_usecase",
+        "use_case_name": "AOG Parts Sourcing & Logistics",
+        "description": "When an aircraft goes AOG with a known defective part, the maintenance controller must locate a serviceable replacement anywhere in the network (own stock, partner airlines, or vendors) and arrange emergency logistics to get the part to the aircraft within hours.",
+        "feature": {
+          "function_name": "Component & Inventory Control",
+          "feature_name": "Rotable & Repairable Pool Management",
+          "description": "Track serialized high-value components through their lifecycle with pool allocation, repair history, and current location across the network",
+          "reason": "Rotables represent the majority of MRO inventory capital; optimized pool management reduces spare asset investment and prevents stockouts"
+        },
+        "reason": "Every hour of AOG costs $10K-$150K. The difference between a 4-hour fix and a 24-hour fix can be $1M+. Rapid parts sourcing during AOG is the single highest-value use case for an AI agent in MRO.",
+        "actors": ["Maintenance Controller (primary)", "Supply Chain Manager (escalation)", "Chief Engineer (cannibalization approval)"],
+        "trigger": "Aircraft.status changes to 'AOG' AND a defective part is identified and removed",
+        "steps": [
+          "Identify the failed part number from the defect or removal record",
+          "Query rotable_component for SERVICEABLE instances of this part number across the network",
+          "If found at same station: dispatch immediately to hangar bay",
+          "If found at another station: calculate fastest logistics (courier, line bus, deadhead crew)",
+          "If no internal stock: query vendor pool for emergency AOG purchase",
+          "If no vendor stock: check if an equivalent or superseded part number can substitute",
+          "If no equivalent: check aircraft in STORED status for cannibalization potential (requires Chief Engineer approval)",
+          "If still no source: escalate to VP Maintenance and Procurement"
+        ],
+        "related_endpoints": ["GET /inventory/rotables?partNumber={pn}&status=SERVICEABLE", "POST /inventory/rotables/{id}/move", "GET /inventory/pools"],
+        "related_tables": ["rotable_component", "part_master", "aircraft", "vendor"],
+        "business_rules": [
+          "Cannibalization (removing part from another aircraft) requires written Chief Engineer approval",
+          "AOG procurement bypasses normal PO process (no price negotiation, any vendor with stock)",
+          "Logistics priority = highest (AOG courier, priority cargo, or airline crew deadhead)",
+          "Part must be traceable back-to-birth — cannot install without valid release certificate",
+          "If cannibalizing from stored aircraft: aircraft cannot be stored with missing LLPs"
+        ],
+        "success_condition": "Serviceable part arrives at AOG aircraft and is installed within target time",
+        "escalation_condition": "No part sourced within 4 hours → escalate to VP Maintenance. 8 hours → escalate to COO.",
+        "agent_training_notes": "This is THE most critical use case. The agent must check all sources rapidly and in the right order: own stock → partner → vendor → cannibalization. Escalate early. Never let the controller waste time searching manually."
+      }
+    ],
+    "decisions": [
+      {
+        "entity_id": "dec_defect_extension",
+        "entity_type": "enriched_decision_rule",
+        "decision_name": "Deferred Defect Extension Approval",
+        "description": "Determines whether a request to extend a deferred defect beyond its current MEL limit can be approved, and by whom.",
+        "feature": {
+          "function_name": "Reliability & Airworthiness Monitoring",
+          "feature_name": "Deferred Defect Management",
+          "description": "Manage minimum equipment list items with categorization, expiry tracking, operational restrictions, and rectification workflow",
+          "reason": "Allows continued safe operation with inoperative non-critical equipment while ensuring defects are fixed within permitted timeframes"
+        },
+        "input_conditions": [
+          "defect.mel_category in ['A', 'B', 'C', 'D']",
+          "requested_extension_days must not exceed MEL category max extension (category-specific)",
+          "defect.is_safety_critical must be FALSE",
+          "Justification document must be provided"
+        ],
+        "approval_rules": [
+          {"condition": "requested_extension_days <= 3 AND mel_category IN ('C','D')", "auto_approve": true, "notes": "Short extensions on low-urgency items are routine"},
+          {"condition": "requested_extension_days > 3 AND mel_category IN ('C','D')", "required_role": "MAINTENANCE_MANAGER", "notes": "Manager must review justification"},
+          {"condition": "mel_category IN ('A','B')", "required_role": "CHIEF_ENGINEER", "notes": "Category A/B items are high urgency — only Chief Engineer can extend"},
+          {"condition": "defect.is_safety_critical == true AND any extension", "auto_approve": false, "notes": "Safety-critical items CANNOT be extended under any circumstances"},
+          {"condition": "airline_impact == 'FLIGHT_CANCELLATION' AND defect.is_safety_critical == false", "auto_approve": true, "notes": "Prevent unnecessary cancellations if safe to defer"}
+        ],
+        "agent_training_notes": "The agent must evaluate these rules in order. Never auto-approve Category A/B extensions — they always need a person. Never extend safety-critical items. If extension prevents a cancellation AND is safe, allow it."
+      }
+    ],
+    "alerts": [
+      {
+        "entity_id": "alt_llp_life_limit",
+        "entity_type": "enriched_alert",
+        "alert_name": "Life-Limited Part Life Consumption Threshold",
+        "description": "Monitors all LLPs across the fleet and triggers alerts at configurable thresholds of life consumed. Three severity levels correspond to increasing urgency.",
+        "feature": {
+          "function_name": "Reliability & Airworthiness Monitoring",
+          "feature_name": "Life-Limited Part Monitoring",
+          "description": "Track parts with fixed life limits by serial number, monitor remaining hours/cycles/calendar time, and enforce removal before expiry",
+          "reason": "Prevents catastrophic failures and ensures full traceability for regulatory audits and asset resale value"
+        },
+        "severity_levels": [
+          {
+            "level": "WARNING",
+            "threshold_pct": 50,
+            "color": "amber",
+            "action": "Notify component engineer to plan replacement at next convenient maintenance slot. Generate shopping cart for replacement part.",
+            "notification_roles": ["Component Engineer", "Reliability Engineer"]
+          },
+          {
+            "level": "CRITICAL",
+            "threshold_pct": 90,
+            "color": "red",
+            "action": "Alert maintenance planner and MCC. Schedule dedicated shop visit. Verify replacement part is on order or in stock. No further deferral possible.",
+            "notification_roles": ["Component Engineer", "Maintenance Planner", "MCC Controller"]
+          },
+          {
+            "level": "EXPIRED",
+            "threshold_pct": 100,
+            "color": "black",
+            "action": "AIRCRAFT GROUNDED. Part must be replaced before next flight. Notify MCC, Fleet Manager, and Chief Engineer immediately. Regulatory non-compliance if flown.",
+            "notification_roles": ["MCC Controller", "Fleet Manager", "Chief Engineer", "VP Maintenance"]
+          }
+        ],
+        "affected_query": "SELECT a.tail_number, llp.part_serial_number, p.part_number, p.part_name, llp.remaining_life, llp.total_life_limit, ((llp.total_life_limit - llp.remaining_life)::decimal / llp.total_life_limit) * 100 AS pct_consumed FROM life_limited_part llp JOIN aircraft a ON llp.aircraft_id = a.aircraft_id JOIN part_master p ON llp.part_master_id = p.part_id WHERE ((llp.total_life_limit - llp.remaining_life)::decimal / llp.total_life_limit) * 100 >= 50 ORDER BY pct_consumed DESC",
+        "agent_notes": "CRITICAL: EXPIRED alert = aircraft cannot fly. Period. No exceptions. The agent must recognize that an LLP with <= 0 remaining_life means the aircraft is grounded by regulation. Notify the appropriate people immediately."
+      }
+    ]
+  }
+}

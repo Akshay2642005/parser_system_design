@@ -1,0 +1,117 @@
+{
+  "maintenance_management_system": {
+    "business_domain": "Airline Maintenance, Repair & Overhaul (MRO)",
+    "functions": [
+      {
+        "function_name": "Aircraft Maintenance Planning & Scheduling",
+        "features": [
+          {
+            "feature_name": "Maintenance Program Check Management",
+            "description": "Define and manage A/B/C/D check packages, interval triggers (flight hours, cycles, calendar), and task scope per aircraft model and variant",
+            "reason": "Ensures each aircraft adheres to manufacturer-approved maintenance programs and prevents unscheduled groundings"
+          },
+          {
+            "feature_name": "Flight Hour & Cycle Accumulation Tracker",
+            "description": "Capture and accumulate flight hours, landings, and pressurization cycles per airframe, engine, and auxiliary power unit from flight operations data",
+            "reason": "Maintenance intervals are consumption-driven; accurate utilization tracking triggers the right maintenance at the right time"
+          },
+          {
+            "feature_name": "Maintenance Visit Forecasting Engine",
+            "description": "Project next due dates for scheduled checks based on projected fleet utilization, seasonality, and historical turnaround patterns",
+            "reason": "Enables long-term hangar slot booking, labor resource allocation, and lease return condition planning months in advance"
+          },
+          {
+            "feature_name": "Task Card Generation & Sequencing",
+            "description": "Auto-generate digital task cards from approved maintenance programs with step-by-step instructions, estimated man-hours, and prerequisite sequencing",
+            "reason": "Standardizes execution across mechanics, eliminates missed steps, and provides baseline data for productivity analysis"
+          },
+          {
+            "feature_name": "Line vs Base Maintenance Routing",
+            "description": "Route tasks to line stations or heavy maintenance hangars based on task complexity, tooling requirements, and aircraft downtime tolerance",
+            "reason": "Optimizes cost and turnaround time by matching task scope to the appropriate execution environment"
+          }
+        ]
+      },
+      {
+        "function_name": "Reliability & Airworthiness Monitoring",
+        "features": [
+          {
+            "feature_name": "Fleet Reliability Dashboard",
+            "description": "Monitor component unscheduled removal rates, mean time between failures, and alert thresholds across the fleet with trend visualization",
+            "reason": "Early detection of systemic reliability issues allows proactive intervention before they affect safety or operational availability"
+          },
+          {
+            "feature_name": "Airworthiness Directive & Service Bulletin Tracker",
+            "description": "Track applicability, embodiment status, and compliance deadlines for all regulatory directives and manufacturer bulletins per aircraft tail number",
+            "reason": "Ensures mandatory safety modifications are applied within regulatory deadlines to maintain airworthiness certification"
+          },
+          {
+            "feature_name": "Life-Limited Part Monitoring",
+            "description": "Track parts with fixed life limits by serial number, monitor remaining hours/cycles/calendar time, and enforce removal before expiry",
+            "reason": "Prevents catastrophic failures and ensures full traceability for regulatory audits and asset resale value"
+          },
+          {
+            "feature_name": "Deferred Defect Management",
+            "description": "Manage minimum equipment list items with categorization, expiry tracking, operational restrictions, and rectification workflow",
+            "reason": "Allows continued safe operation with inoperative non-critical equipment while ensuring defects are fixed within permitted timeframes"
+          }
+        ]
+      },
+      {
+        "function_name": "Component & Inventory Control",
+        "features": [
+          {
+            "feature_name": "Rotable & Repairable Pool Management",
+            "description": "Track serialized high-value components through their lifecycle with pool allocation, repair history, and current location across the network",
+            "reason": "Rotables represent the majority of MRO inventory capital; optimized pool management reduces spare asset investment and prevents stockouts"
+          },
+          {
+            "feature_name": "Repair Order & Shop Visit Coordination",
+            "description": "Manage component repair orders with vendor selection, turnaround time tracking, warranty linkage, and cost accrual per shop visit",
+            "reason": "External repairs are major cost drivers; tracking shop visit performance ensures predictable return-to-service times"
+          },
+          {
+            "feature_name": "Shelf-Life & Calibration Control",
+            "description": "Monitor expiry dates for shelf-life limited materials and calibration due dates for precision tooling with automatic alert generation",
+            "reason": "Prevents use of expired materials or uncalibrated tools which invalidates maintenance records and compromises airworthiness"
+          }
+        ]
+      },
+      {
+        "function_name": "Technical Records & Documentation",
+        "features": [
+          {
+            "feature_name": "Digital Logbook Management",
+            "description": "Maintain aircraft, engine, and propeller logbooks with digital signatures, immutable revision history, and centralized archival",
+            "reason": "Logbooks are the legal proof of airworthiness; digitization prevents loss and accelerates audit and resale processes"
+          },
+          {
+            "feature_name": "Maintenance Release & Certificate Generation",
+            "description": "Generate certificates of release to service with authorized signatory validation, digital stamping, and automatic linkage to completed task records",
+            "reason": "The CRS is the legal document permitting flight after maintenance; invalid or missing certificates ground the aircraft"
+          },
+          {
+            "feature_name": "Back-to-Birth Traceability",
+            "description": "Maintain complete component history from original manufacture through all maintenance events, repairs, and installations to current position",
+            "reason": "Complete traceability is required for accident investigation, warranty claims, and maximizing aircraft residual value at sale or lease return"
+          }
+        ]
+      },
+      {
+        "function_name": "Workforce & Hangar Resource Management",
+        "features": [
+          {
+            "feature_name": "Mechanic Qualification & Authorization Matrix",
+            "description": "Track individual mechanic licenses, aircraft type ratings, task authorizations, and recency of experience with automatic expiry alerts",
+            "reason": "Ensures only properly qualified and authorized personnel perform maintenance, preventing regulatory violations and safety risks"
+          },
+          {
+            "feature_name": "Hangar Capacity & Slot Planning",
+            "description": "Visualize hangar bay occupancy, plan aircraft input/output sequences, and allocate tooling and floor space per maintenance visit",
+            "reason": "Hangar space is expensive and finite; efficient slot planning maximizes throughput and minimizes aircraft waiting time"
+          }
+        ]
+      }
+    ]
+  }
+}

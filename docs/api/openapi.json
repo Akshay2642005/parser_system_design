@@ -1,0 +1,4274 @@
+---
+openapi: 3.1.0
+info:
+  contact:
+    name: Horizon Airlines Engineering
+  description: Maintenance Management System API for Horizon Airlines
+  license:
+    name: Proprietary
+  title: Horizon Airlines MMS API
+  version: 1.0.0
+security:
+- bearerAuth: []
+paths:
+  /api/v1/aircraft:
+    get:
+      summary: List aircraft
+      description: Returns a paginated list of aircraft with optional filters
+      tags:
+      - Aircraft
+      parameters:
+      - name: location
+        in: query
+        schema:
+          type: string
+      - name: modelId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: List of aircraft
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AircraftResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/aircraft/{id}:
+    get:
+      summary: Get aircraft details
+      description: Returns aircraft information with installed engines
+      tags:
+      - Aircraft
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Aircraft details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AircraftDetailResponse"
+        "404":
+          description: Aircraft not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/aircraft/{id}/status:
+    get:
+      summary: Get airworthiness status
+      description: Returns whether the aircraft is airworthy and any blocking items
+      tags:
+      - Aircraft
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Airworthiness status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AircraftAirworthinessResponse"
+        "404":
+          description: Aircraft not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/audit/stream:
+    get:
+      summary: Real-time audit event stream (SSE)
+      tags:
+      - Audit Log
+      responses:
+        "200":
+          description: SSE stream of audit events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/audit/{entityType}/{entityId}:
+    get:
+      summary: Get audit trail for an entity
+      tags:
+      - Audit Log
+      parameters:
+      - name: entityId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: entityType
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: action
+        in: query
+        schema:
+          type: string
+      - name: endDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/Instant"
+      - name: startDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/Instant"
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLogEntryResponse"
+        "404":
+          description: Entity not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/dev/token:
+    get:
+      parameters:
+      - name: groups
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+      summary: Token
+      tags:
+      - Dev Token Resource
+  /api/v1/documents/search:
+    get:
+      summary: Search documents by OCR content
+      tags:
+      - Documents
+      parameters:
+      - name: aircraftId
+        in: query
+        schema:
+          type: string
+      - name: category
+        in: query
+        schema:
+          type: string
+      - name: query
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentSearchResult"
+        "400":
+          description: Invalid query
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/documents/upload:
+    post:
+      summary: Upload maintenance document
+      tags:
+      - Documents
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                category:
+                  type: string
+                type:
+                  type: string
+                aircraftId:
+                  type: string
+                visitId:
+                  type: string
+                fileName:
+                  type: string
+                fileSize:
+                  type: integer
+                  format: int64
+                mimeType:
+                  type: string
+                tags:
+                  type: string
+        required: true
+      responses:
+        "200":
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentUploadResponse"
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/documents/{id}:
+    get:
+      summary: Get document metadata
+      tags:
+      - Documents
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: category
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Document metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentMetadataResponse"
+        "404":
+          description: Document not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/documents/{id}/download:
+    get:
+      summary: Download document file
+      tags:
+      - Documents
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: category
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: File content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Document not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/events/component/{componentId}:
+    get:
+      summary: Get component lifecycle events
+      tags:
+      - Component Events
+      parameters:
+      - name: componentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: endDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/Instant"
+      - name: eventType
+        in: query
+        schema:
+          type: string
+      - name: startDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/Instant"
+      responses:
+        "200":
+          description: Component event list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComponentEventResponse"
+        "404":
+          description: Component not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/health:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+      summary: Hello
+      tags:
+      - Health Check Resource
+  /api/v1/inventory/calibration-tools:
+    get:
+      summary: List calibration tools
+      description: "Filter by station, status, or due window"
+      tags:
+      - Inventory Control
+      parameters:
+      - name: dueWithinDays
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: stationId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Calibration tools returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalibrationToolResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/inventory/calibration-tools/{id}/calibrate:
+    post:
+      summary: Record calibration for a tool
+      tags:
+      - Inventory Control
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalibrationRecordRequest"
+        required: true
+      responses:
+        "200":
+          description: Calibration recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalibrationToolResponse"
+        "404":
+          description: Tool not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/inventory/pools:
+    get:
+      summary: List pool allocations
+      description: Filter by part master or station
+      tags:
+      - Inventory Control
+      parameters:
+      - name: partMasterId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: stationId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Pool allocations returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PoolAllocationResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/inventory/pools/rebalance:
+    post:
+      summary: Rebalance pool stock levels
+      tags:
+      - Inventory Control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PoolRebalanceRequest"
+        required: true
+      responses:
+        "200":
+          description: Pools rebalanced
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PoolAllocationResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/inventory/repair-orders:
+    get:
+      summary: List repair orders
+      description: "Filter by component, vendor, status, or overdue"
+      tags:
+      - Inventory Control
+      parameters:
+      - name: componentId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: overdueOnly
+        in: query
+        schema:
+          type: boolean
+          default: "false"
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: vendorId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Repair orders returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RepairOrderResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+    post:
+      summary: Create a new repair order
+      tags:
+      - Inventory Control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepairOrderRequest"
+        required: true
+      responses:
+        "200":
+          description: Repair order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairOrderResponse"
+        "400":
+          description: Validation error
+        "409":
+          description: Component already in repair
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/inventory/repair-orders/{id}/receive:
+    post:
+      summary: Record receipt of repaired component
+      tags:
+      - Inventory Control
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepairReceiptRequest"
+        required: true
+      responses:
+        "200":
+          description: Receipt recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairOrderResponse"
+        "404":
+          description: Repair order not found
+        "409":
+          description: Already received
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/inventory/repair-orders/{id}/status:
+    get:
+      summary: Get repair order status with lateness info
+      tags:
+      - Inventory Control
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Repair order status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairOrderStatusResponse"
+        "404":
+          description: Repair order not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/inventory/rotables:
+    get:
+      summary: List rotable components
+      description: "Filter by part, status, station, or serial number"
+      tags:
+      - Inventory Control
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: partMasterId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: serialNumber
+        in: query
+        schema:
+          type: string
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: stationId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Rotable components returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RotableComponentResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/inventory/rotables/{id}:
+    get:
+      summary: Get rotable component detail with history
+      tags:
+      - Inventory Control
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Rotable component with history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotableComponentDetailResponse"
+        "404":
+          description: Component not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/inventory/rotables/{id}/move:
+    post:
+      summary: Move rotable component to another station
+      tags:
+      - Inventory Control
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComponentMoveRequest"
+        required: true
+      responses:
+        "200":
+          description: Component moved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotableComponentResponse"
+        "404":
+          description: Component or station not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/inventory/shelf-life:
+    get:
+      summary: List shelf-life tracked materials
+      description: "Filter by station, status, or expiry window"
+      tags:
+      - Inventory Control
+      parameters:
+      - name: expiringWithinDays
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: stationId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Shelf-life materials returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShelfLifeMaterialResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/inventory/vendors/{id}/performance:
+    get:
+      summary: Get vendor performance metrics
+      tags:
+      - Inventory Control
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: periodMonths
+        in: query
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Vendor performance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorPerformanceResponse"
+        "404":
+          description: Vendor not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/planning/check-packages:
+    get:
+      summary: List check packages
+      description: Returns paginated list of check packages with optional filters
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: checkType
+        in: query
+        schema:
+          type: string
+      - name: isActive
+        in: query
+        schema:
+          type: boolean
+      - name: modelId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CheckPackageResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+    post:
+      summary: Create check package
+      description: Creates a new check package under a maintenance program
+      tags:
+      - Maintenance Planning
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckPackageRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckPackageResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/planning/check-packages/{id}:
+    put:
+      summary: Update check package
+      description: Updates an existing check package (new version)
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckPackageRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckPackageResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+    get:
+      summary: Get check package detail
+      description: Returns check package with its tasks
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckPackageDetailResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/planning/forecasts:
+    get:
+      summary: List forecasts
+      description: Returns maintenance forecasts with optional filters
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: aircraftId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: confidenceLevel
+        in: query
+        schema:
+          type: string
+      - name: periodEnd
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      - name: periodStart
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaintenanceForecastResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/planning/forecasts/generate:
+    post:
+      summary: Generate forecast
+      description: Generates utilization forecasts for specified aircraft (async)
+      tags:
+      - Maintenance Planning
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForecastGenerationRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/planning/forecasts/{id}/scenario:
+    get:
+      summary: Compare forecast scenarios
+      description: Compares two forecast scenarios and returns differences
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: comparisonId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForecastComparisonResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/planning/routing/recommendation:
+    get:
+      summary: Get routing recommendation
+      description: Recommends line vs base maintenance routing for given tasks
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: aircraftId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: currentStation
+        in: query
+        schema:
+          type: string
+      - name: taskIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingRecommendationResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/planning/stations/{code}/capabilities:
+    get:
+      summary: Get station capabilities
+      description: Returns maintenance capabilities for a station
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StationCapabilityResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/planning/utilization:
+    post:
+      summary: Record flight utilization
+      description: Records flight/usage data for an aircraft
+      tags:
+      - Maintenance Planning
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlightUtilizationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightUtilizationResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/planning/utilization/{aircraftId}:
+    get:
+      summary: Get utilization history
+      description: Returns paginated utilization records for an aircraft
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: aircraftId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: endDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: startDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FlightUtilizationResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/planning/utilization/{aircraftId}/accumulated:
+    get:
+      summary: Get accumulated utilization
+      description: Returns current total FH/FC for an aircraft
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: aircraftId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccumulatedUtilizationResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/planning/utilization/{id}/adjust:
+    post:
+      summary: Adjust utilization
+      description: Manually adjust a utilization record (admin)
+      tags:
+      - Maintenance Planning
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UtilizationAdjustmentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightUtilizationResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:admin
+  /api/v1/records/crs/generate:
+    post:
+      summary: Generate CRS
+      description: Generates a Certificate of Release to Service for a visit
+      tags:
+      - Technical Records
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CRSGenerationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertificateReleaseResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:certify
+  /api/v1/records/crs/{id}/download:
+    get:
+      summary: Download CRS
+      description: Downloads a CRS PDF document
+      tags:
+      - Technical Records
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/records/crs/{id}/validate:
+    get:
+      summary: Validate CRS
+      description: Validates a Certificate of Release to Service
+      tags:
+      - Technical Records
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CRSValidationResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/records/logbooks:
+    get:
+      summary: List logbooks
+      description: "Returns logbooks filtered by aircraft, engine, or type"
+      tags:
+      - Technical Records
+      parameters:
+      - name: aircraftId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: engineId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: logbookType
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogbookResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/records/logbooks/{id}/entries:
+    get:
+      summary: Get logbook entries
+      description: Returns paginated entries for a logbook
+      tags:
+      - Technical Records
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: endDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      - name: entryType
+        in: query
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: startDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogbookEntryResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+    post:
+      summary: Create logbook entry
+      description: Creates a new entry in the specified logbook
+      tags:
+      - Technical Records
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogbookEntryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogbookEntryResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/records/logbooks/{id}/entries/{eid}/amend:
+    post:
+      summary: Amend logbook entry
+      description: Amends an existing logbook entry (admin)
+      tags:
+      - Technical Records
+      parameters:
+      - name: eid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogbookAmendmentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogbookEntryResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:admin
+  /api/v1/records/traceability/gaps:
+    get:
+      summary: Find traceability gaps
+      description: Finds gaps in component traceability history
+      tags:
+      - Technical Records
+      parameters:
+      - name: componentId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TraceabilityGapResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/records/traceability/{id}:
+    get:
+      summary: Component traceability
+      description: Returns full back-to-birth traceability for a component
+      tags:
+      - Technical Records
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComponentTraceabilityResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/records/traceability/{id}/pedigree:
+    get:
+      summary: Component pedigree
+      description: Returns pedigree certificate URL for a component
+      tags:
+      - Technical Records
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PedigreeCertificateResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/reliability/ads:
+    get:
+      summary: List airworthiness directives
+      description: Returns ADs with optional filters
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: aircraftModelId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: authority
+        in: query
+        schema:
+          type: string
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: List of ADs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AirworthinessDirectiveResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/reliability/ads/{id}/applicability:
+    get:
+      summary: Check AD applicability
+      description: Check which aircraft an AD applies to
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Applicability results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ADApplicabilityResponse"
+        "404":
+          description: AD not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/reliability/compliance:
+    get:
+      summary: Get compliance status
+      description: Returns AD/SB compliance status for fleet
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: aircraftId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: complianceStatus
+        in: query
+        schema:
+          type: string
+      - name: overdueOnly
+        in: query
+        schema:
+          type: boolean
+      responses:
+        "200":
+          description: Compliance status list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComplianceStatusResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/reliability/compliance/{id}/update:
+    post:
+      summary: Update compliance
+      description: Update compliance status for an AD/SB record
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComplianceUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: Compliance updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceStatusResponse"
+        "404":
+          description: Compliance record not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/reliability/defects:
+    get:
+      summary: List deferred defects
+      description: Returns deferred defects with optional filters
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: aircraftId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: expiringWithinDays
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: List of deferred defects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeferredDefectResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+    post:
+      summary: Create deferred defect
+      description: Create a new MEL/CDL defect deferral
+      tags:
+      - Reliability & Airworthiness
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeferredDefectRequest"
+        required: true
+      responses:
+        "200":
+          description: Defect created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeferredDefectResponse"
+        "404":
+          description: Aircraft or mechanic not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/reliability/defects/{id}/extend:
+    post:
+      summary: Extend deferral
+      description: Extend the deferral period for a deferred defect
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DefectExtensionRequest"
+        required: true
+      responses:
+        "200":
+          description: Defect extended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeferredDefectResponse"
+        "404":
+          description: Defect not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:admin
+  /api/v1/reliability/defects/{id}/rectify:
+    post:
+      summary: Rectify defect
+      description: Mark a deferred defect as rectified
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DefectRectificationRequest"
+        required: true
+      responses:
+        "200":
+          description: Defect rectified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeferredDefectResponse"
+        "404":
+          description: Defect not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/reliability/llp:
+    get:
+      summary: List life-limited parts
+      description: Returns LLP inventory with optional filters
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: engineId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: thresholdAlert
+        in: query
+        schema:
+          type: boolean
+      responses:
+        "200":
+          description: List of LLPs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LifeLimitedPartResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/reliability/llp/{id}/forecast:
+    get:
+      summary: Get LLP replacement forecast
+      description: Forecast when an LLP will need replacement
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Replacement forecast
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LLPReplacementForecastResponse"
+        "404":
+          description: LLP not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/reliability/metrics:
+    get:
+      summary: List fleet health metrics
+      description: Returns reliability metrics with optional filters
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: aircraftModelId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: componentCategory
+        in: query
+        schema:
+          type: string
+      - name: metricType
+        in: query
+        schema:
+          type: string
+      - name: periodEnd
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      - name: periodStart
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      responses:
+        "200":
+          description: List of metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReliabilityMetricResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/reliability/metrics/alerts:
+    get:
+      summary: Get active alerts
+      description: Returns active reliability alerts
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: investigationStatus
+        in: query
+        schema:
+          type: string
+      - name: severity
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: List of active alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReliabilityAlertResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/reliability/metrics/{id}/investigate:
+    post:
+      summary: Start investigation
+      description: Start an investigation for a reliability metric
+      tags:
+      - Reliability & Airworthiness
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestigationRequest"
+        required: true
+      responses:
+        "200":
+          description: Investigation started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReliabilityMetricResponse"
+        "404":
+          description: Metric not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/task-cards/{id}/assign:
+    post:
+      summary: Assign mechanic to task card
+      description: Assigns a mechanic to a pending task card
+      tags:
+      - Task Cards
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskCardAssignmentRequest"
+        required: true
+      responses:
+        "200":
+          description: Mechanic assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCardResponse"
+        "409":
+          description: Task card is not PENDING
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/task-cards/{id}/complete:
+    post:
+      summary: Complete a task card
+      description: Marks an in-progress task card as completed with findings
+      tags:
+      - Task Cards
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskCardCompletionRequest"
+        required: true
+      responses:
+        "200":
+          description: Task card completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCardResponse"
+        "409":
+          description: Task card is not IN_PROGRESS
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/task-cards/{id}/defer:
+    post:
+      summary: Defer a task card
+      description: Defers a task card to a future visit
+      tags:
+      - Task Cards
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskCardDeferralRequest"
+        required: true
+      responses:
+        "200":
+          description: Task card deferred
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCardResponse"
+        "409":
+          description: Cannot defer a completed task
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/task-cards/{id}/inspector-sign-off:
+    post:
+      summary: Inspector sign-off on task card
+      description: Records inspector approval for a completed task card
+      tags:
+      - Task Cards
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InspectorSignOffRequest"
+        required: true
+      responses:
+        "200":
+          description: Inspector sign-off recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCardResponse"
+        "409":
+          description: Task card is not COMPLETED
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/task-cards/{id}/start:
+    post:
+      summary: Start work on task card
+      description: Marks a pending task card as in-progress
+      tags:
+      - Task Cards
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Task card started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCardResponse"
+        "409":
+          description: Task card is not PENDING
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/visits:
+    get:
+      summary: List maintenance visits
+      description: Returns a paginated list of maintenance visits with optional filters
+      tags:
+      - Maintenance Visits
+      parameters:
+      - name: aircraftId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: checkType
+        in: query
+        schema:
+          type: string
+      - name: endDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDateTime"
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: startDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDateTime"
+      - name: stationId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: List of visits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaintenanceVisitResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+    post:
+      summary: Create a maintenance visit
+      description: Creates a new maintenance visit with task cards from the check
+        package
+      tags:
+      - Maintenance Visits
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMaintenanceVisitRequest"
+        required: true
+      responses:
+        "200":
+          description: Visit created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceVisitResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/visits/{id}:
+    get:
+      summary: Get visit details
+      description: Returns visit details with its task cards
+      tags:
+      - Maintenance Visits
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Visit details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceVisitDetailResponse"
+        "404":
+          description: Visit not found
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/visits/{id}/complete:
+    post:
+      summary: Complete a visit
+      description: Marks an in-progress visit as completed
+      tags:
+      - Maintenance Visits
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisitCompletionRequest"
+        required: true
+      responses:
+        "200":
+          description: Visit completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceVisitResponse"
+        "409":
+          description: Visit is not in IN_PROGRESS status
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/visits/{id}/start:
+    post:
+      summary: Start a visit
+      description: Marks a confirmed visit as in-progress
+      tags:
+      - Maintenance Visits
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisitStartRequest"
+        required: true
+      responses:
+        "200":
+          description: Visit started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceVisitResponse"
+        "409":
+          description: Visit is not in CONFIRMED status
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/visits/{id}/task-cards:
+    get:
+      summary: List task cards for a visit
+      description: "Returns all task cards associated with a visit, with optional\
+        \ filters"
+      tags:
+      - Maintenance Visits
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: mechanicId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: List of task cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskCardResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/workforce/hangars:
+    get:
+      summary: List hangars
+      description: Returns hangars with optional filters
+      tags:
+      - Workforce & Hangar
+      parameters:
+      - name: hasAvailability
+        in: query
+        schema:
+          type: boolean
+      - name: maxAircraftSize
+        in: query
+        schema:
+          type: string
+      - name: stationId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HangarResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/workforce/hangars/{id}/bays:
+    get:
+      summary: Get hangar bays
+      description: Returns bays for a hangar
+      tags:
+      - Workforce & Hangar
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HangarBayResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/workforce/hangars/{id}/schedule:
+    get:
+      summary: Get hangar schedule
+      description: Returns Gantt-style schedule for a hangar
+      tags:
+      - Workforce & Hangar
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: endDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      - name: startDate
+        in: query
+        schema:
+          $ref: "#/components/schemas/LocalDate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HangarScheduleResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/workforce/hangars/{id}/slots:
+    post:
+      summary: Reserve slot
+      description: Reserves a hangar bay slot for a maintenance visit
+      tags:
+      - Workforce & Hangar
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HangarSlotReservationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HangarSlotResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/workforce/hangars/{id}/slots/{sid}/release:
+    post:
+      summary: Release slot
+      description: Releases a reserved hangar bay slot
+      tags:
+      - Workforce & Hangar
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: sid
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlotReleaseRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HangarSlotResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - bearerAuth:
+        - mms:write
+  /api/v1/workforce/mechanics:
+    get:
+      summary: List mechanics
+      description: Returns paginated list of mechanics with optional filters
+      tags:
+      - Workforce & Hangar
+      parameters:
+      - name: employmentStatus
+        in: query
+        schema:
+          type: string
+      - name: isCertifyingStaff
+        in: query
+        schema:
+          type: boolean
+      - name: licenseType
+        in: query
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: stationId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MechanicResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/workforce/mechanics/{id}/authorization-check:
+    get:
+      summary: Check task authorization
+      description: Checks if a mechanic is authorized for a given task
+      tags:
+      - Workforce & Hangar
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: aircraftType
+        in: query
+        schema:
+          type: string
+      - name: taskId
+        in: query
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorizationCheckResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/workforce/mechanics/{id}/qualifications:
+    get:
+      summary: Get mechanic qualifications
+      description: Returns qualifications for a mechanic
+      tags:
+      - Workforce & Hangar
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MechanicQualificationResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+  /api/v1/workforce/qualifications/expiring:
+    get:
+      summary: Expiring qualifications
+      description: Returns qualifications expiring within a given window
+      tags:
+      - Workforce & Hangar
+      parameters:
+      - name: licenseType
+        in: query
+        schema:
+          type: string
+      - name: withinDays
+        in: query
+        schema:
+          type: integer
+          format: int64
+          default: "30"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QualificationExpiryResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - bearerAuth:
+        - mms:read
+tags:
+- name: Aircraft
+- name: Audit Log
+- name: Component Events
+- name: Documents
+- name: Inventory Control
+- name: Maintenance Planning
+- name: Maintenance Visits
+- name: Reliability & Airworthiness
+- name: Task Cards
+- name: Technical Records
+- name: Workforce & Hangar
+components:
+  schemas:
+    ADApplicabilityResponse:
+      type: object
+      properties:
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        tailNumber:
+          type: string
+        isApplicable:
+          type: boolean
+        complianceStatus:
+          type: string
+    AccumulatedUtilizationResponse:
+      type: object
+      properties:
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        tailNumber:
+          type: string
+        totalFlightHours:
+          type: number
+        totalCycles:
+          type: integer
+          format: int32
+        lastFlightDate:
+          $ref: "#/components/schemas/LocalDate"
+    AircraftAirworthinessResponse:
+      type: object
+      properties:
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        tailNumber:
+          type: string
+        isAirworthy:
+          type: boolean
+        blockingItems:
+          type: array
+          items:
+            type: string
+    AircraftDetailResponse:
+      type: object
+      properties:
+        aircraft:
+          $ref: "#/components/schemas/AircraftResponse"
+        engines:
+          type: array
+          items:
+            $ref: "#/components/schemas/EngineInfo"
+        activeDefects:
+          type: integer
+          format: int32
+        pendingCompliance:
+          type: integer
+          format: int32
+        lastVisitDate:
+          $ref: "#/components/schemas/LocalDate"
+    AircraftResponse:
+      type: object
+      properties:
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        tailNumber:
+          type: string
+        serialNumber:
+          type: string
+        modelFamily:
+          type: string
+        modelVariant:
+          type: string
+        status:
+          type: string
+        totalFlightHours:
+          type: number
+        totalCycles:
+          type: integer
+          format: int32
+        currentLocation:
+          type: string
+        ownerOperator:
+          type: string
+    AirworthinessDirectiveResponse:
+      type: object
+      properties:
+        adId:
+          $ref: "#/components/schemas/UUID"
+        adNumber:
+          type: string
+        authority:
+          type: string
+        subject:
+          type: string
+        description:
+          type: string
+        issueDate:
+          $ref: "#/components/schemas/LocalDate"
+        effectiveDate:
+          $ref: "#/components/schemas/LocalDate"
+        complianceDeadline:
+          $ref: "#/components/schemas/LocalDate"
+        complianceMethod:
+          type: string
+        status:
+          type: string
+        supersededBy:
+          $ref: "#/components/schemas/UUID"
+    AuditLogEntryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+        action:
+          type: string
+        timestamp:
+          $ref: "#/components/schemas/Instant"
+        userId:
+          type: string
+        userName:
+          type: string
+        reason:
+          type: string
+        ipAddress:
+          type: string
+    AuthorizationCheckResponse:
+      type: object
+      properties:
+        isAuthorized:
+          type: boolean
+        missingQualifications:
+          type: array
+          items:
+            type: string
+    BaySchedule:
+      type: object
+      properties:
+        bayId:
+          $ref: "#/components/schemas/UUID"
+        bayNumber:
+          type: string
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/HangarSlotResponse"
+    CRSGenerationRequest:
+      type: object
+      required:
+      - visitId
+      - certifyingStaffId
+      properties:
+        visitId:
+          $ref: "#/components/schemas/UUID"
+        certifyingStaffId:
+          $ref: "#/components/schemas/UUID"
+        scopeDescription:
+          type: string
+    CRSValidationResponse:
+      type: object
+      properties:
+        crsId:
+          $ref: "#/components/schemas/UUID"
+        isValid:
+          type: boolean
+        blockingIssues:
+          type: array
+          items:
+            type: string
+    CalibrationRecordRequest:
+      type: object
+      properties:
+        calibrationDate:
+          $ref: "#/components/schemas/LocalDate"
+        certificateId:
+          $ref: "#/components/schemas/UUID"
+        performedBy:
+          type: string
+    CalibrationToolResponse:
+      type: object
+      properties:
+        toolId:
+          $ref: "#/components/schemas/UUID"
+        toolReference:
+          type: string
+        toolName:
+          type: string
+        lastCalibrationDate:
+          $ref: "#/components/schemas/LocalDate"
+        nextCalibrationDate:
+          $ref: "#/components/schemas/LocalDate"
+        calibrationIntervalMonths:
+          type: integer
+          format: int32
+        stationCode:
+          type: string
+        status:
+          type: string
+        daysUntilDue:
+          type: integer
+          format: int64
+    CertificateReleaseResponse:
+      type: object
+      properties:
+        crsId:
+          $ref: "#/components/schemas/UUID"
+        crsNumber:
+          type: string
+        crsType:
+          type: string
+        aircraftTailNumber:
+          type: string
+        visitReference:
+          type: string
+        issueDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        validFrom:
+          $ref: "#/components/schemas/LocalDateTime"
+        validUntil:
+          $ref: "#/components/schemas/LocalDateTime"
+        scopeDescription:
+          type: string
+        certifyingStaffName:
+          type: string
+        status:
+          type: string
+    CheckPackageDetailResponse:
+      type: object
+      properties:
+        packageId:
+          $ref: "#/components/schemas/UUID"
+        programId:
+          $ref: "#/components/schemas/UUID"
+        checkType:
+          type: string
+        checkName:
+          type: string
+        intervalFlightHours:
+          type: number
+        intervalCycles:
+          type: integer
+          format: int32
+        intervalCalendarDays:
+          type: integer
+          format: int32
+        estimatedManHours:
+          type: number
+        estimatedDurationDays:
+          type: integer
+          format: int32
+        hangarRequired:
+          type: boolean
+        version:
+          type: integer
+          format: int32
+        effectiveDate:
+          $ref: "#/components/schemas/LocalDate"
+        isActive:
+          type: boolean
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceTaskResponse"
+    CheckPackageRequest:
+      type: object
+      properties:
+        programId:
+          $ref: "#/components/schemas/UUID"
+        checkType:
+          type: string
+        checkName:
+          type: string
+        intervalFlightHours:
+          type: number
+        intervalCycles:
+          type: integer
+          format: int32
+        intervalCalendarDays:
+          type: integer
+          format: int32
+        estimatedManHours:
+          type: number
+        estimatedDurationDays:
+          type: integer
+          format: int32
+        hangarRequired:
+          type: boolean
+        effectiveDate:
+          $ref: "#/components/schemas/LocalDate"
+    CheckPackageResponse:
+      type: object
+      properties:
+        packageId:
+          $ref: "#/components/schemas/UUID"
+        programId:
+          $ref: "#/components/schemas/UUID"
+        checkType:
+          type: string
+        checkName:
+          type: string
+        intervalFlightHours:
+          type: number
+        intervalCycles:
+          type: integer
+          format: int32
+        intervalCalendarDays:
+          type: integer
+          format: int32
+        estimatedManHours:
+          type: number
+        estimatedDurationDays:
+          type: integer
+          format: int32
+        hangarRequired:
+          type: boolean
+        version:
+          type: integer
+          format: int32
+        effectiveDate:
+          $ref: "#/components/schemas/LocalDate"
+        isActive:
+          type: boolean
+    ComplianceStatusResponse:
+      type: object
+      properties:
+        complianceId:
+          $ref: "#/components/schemas/UUID"
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        tailNumber:
+          type: string
+        adId:
+          $ref: "#/components/schemas/UUID"
+        adNumber:
+          type: string
+        sbId:
+          $ref: "#/components/schemas/UUID"
+        sbNumber:
+          type: string
+        applicabilityStatus:
+          type: string
+        complianceStatus:
+          type: string
+        plannedCompletionDate:
+          $ref: "#/components/schemas/LocalDate"
+        actualCompletionDate:
+          $ref: "#/components/schemas/LocalDate"
+        methodOfCompliance:
+          type: string
+    ComplianceUpdateRequest:
+      type: object
+      required:
+      - complianceStatus
+      properties:
+        complianceStatus:
+          type: string
+        actualCompletionDate:
+          $ref: "#/components/schemas/LocalDate"
+        methodOfCompliance:
+          type: string
+    ComponentEventResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        componentId:
+          type: string
+        eventType:
+          type: string
+        eventDate:
+          $ref: "#/components/schemas/Instant"
+        aircraftId:
+          type: string
+        engineId:
+          type: string
+        positionDescription:
+          type: string
+        flightHoursAtEvent:
+          type: number
+        cyclesAtEvent:
+          type: integer
+          format: int32
+        reason:
+          type: string
+        documentReference:
+          type: string
+        performedBy:
+          type: string
+        stationId:
+          type: string
+        certificateId:
+          type: string
+    ComponentHistoryResponse:
+      type: object
+      properties:
+        historyId:
+          $ref: "#/components/schemas/UUID"
+        eventType:
+          type: string
+        eventDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        tailNumber:
+          type: string
+        positionDescription:
+          type: string
+        flightHoursAtEvent:
+          type: number
+        cyclesAtEvent:
+          type: integer
+          format: int32
+        reason:
+          type: string
+        stationName:
+          type: string
+        certificateRef:
+          type: string
+    ComponentMoveRequest:
+      type: object
+      properties:
+        toStationId:
+          $ref: "#/components/schemas/UUID"
+        reason:
+          type: string
+        authorizedBy:
+          $ref: "#/components/schemas/UUID"
+    ComponentTraceabilityResponse:
+      type: object
+      properties:
+        componentId:
+          $ref: "#/components/schemas/UUID"
+        serialNumber:
+          type: string
+        partNumber:
+          type: string
+        partName:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentHistoryResponse"
+    CreateMaintenanceVisitRequest:
+      type: object
+      required:
+      - aircraftId
+      - packageId
+      - visitType
+      - plannedStartDate
+      - plannedEndDate
+      - stationId
+      properties:
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        packageId:
+          $ref: "#/components/schemas/UUID"
+        visitType:
+          type: string
+        plannedStartDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        plannedEndDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        stationId:
+          $ref: "#/components/schemas/UUID"
+        hangarBayId:
+          $ref: "#/components/schemas/UUID"
+    DefectExtensionRequest:
+      type: object
+      required:
+      - extensionDays
+      - justification
+      - authorizedBy
+      properties:
+        extensionDays:
+          type: integer
+          format: int32
+        justification:
+          type: string
+        authorizedBy:
+          $ref: "#/components/schemas/UUID"
+    DefectRectificationRequest:
+      type: object
+      required:
+      - taskCardId
+      properties:
+        taskCardId:
+          $ref: "#/components/schemas/UUID"
+        rectifiedBy:
+          type: string
+    DeferredDefectRequest:
+      type: object
+      required:
+      - aircraftId
+      - itemDescription
+      - deferralAuthorizedBy
+      properties:
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        melReference:
+          type: string
+        cdlReference:
+          type: string
+        itemDescription:
+          type: string
+        melCategory:
+          type: string
+        deferralPeriodDays:
+          type: integer
+          format: int32
+        operationalRestrictions:
+          type: string
+        deferralAuthorizedBy:
+          $ref: "#/components/schemas/UUID"
+    DeferredDefectResponse:
+      type: object
+      properties:
+        defectId:
+          $ref: "#/components/schemas/UUID"
+        defectReference:
+          type: string
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        tailNumber:
+          type: string
+        melReference:
+          type: string
+        itemDescription:
+          type: string
+        melCategory:
+          type: string
+        deferralPeriodDays:
+          type: integer
+          format: int32
+        deferredDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        expiryDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        operationalRestrictions:
+          type: string
+        deferralAuthorizedByName:
+          type: string
+        status:
+          type: string
+        extensionCount:
+          type: integer
+          format: int32
+    DocumentMetadataResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        documentCategory:
+          type: string
+        documentType:
+          type: string
+        aircraftId:
+          type: string
+        visitId:
+          type: string
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+          format: int64
+        mimeType:
+          type: string
+        uploadDate:
+          $ref: "#/components/schemas/Instant"
+        uploadedBy:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    DocumentSearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+        documentCategory:
+          type: string
+        documentType:
+          type: string
+        fileName:
+          type: string
+        aircraftId:
+          type: string
+        snippet:
+          type: string
+        score:
+          type: number
+          format: double
+    DocumentUploadResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        fileName:
+          type: string
+        documentCategory:
+          type: string
+        uploadDate:
+          $ref: "#/components/schemas/Instant"
+    EngineInfo:
+      type: object
+      properties:
+        engineId:
+          $ref: "#/components/schemas/UUID"
+        engineSerialNumber:
+          type: string
+        positionNumber:
+          type: integer
+          format: int32
+        status:
+          type: string
+        totalFlightHours:
+          type: number
+        totalCycles:
+          type: integer
+          format: int32
+    FlightUtilizationRequest:
+      type: object
+      properties:
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        flightDate:
+          $ref: "#/components/schemas/LocalDate"
+        flightNumber:
+          type: string
+        departureStationCode:
+          type: string
+        arrivalStationCode:
+          type: string
+        blockTimeHours:
+          type: number
+        flightHours:
+          type: number
+        cycles:
+          type: integer
+          format: int32
+        engine1Hours:
+          type: number
+        engine2Hours:
+          type: number
+        apuHours:
+          type: number
+        dataSource:
+          type: string
+    FlightUtilizationResponse:
+      type: object
+      properties:
+        utilizationId:
+          $ref: "#/components/schemas/UUID"
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        tailNumber:
+          type: string
+        flightDate:
+          $ref: "#/components/schemas/LocalDate"
+        flightNumber:
+          type: string
+        departureStation:
+          type: string
+        arrivalStation:
+          type: string
+        blockTimeHours:
+          type: number
+        flightHours:
+          type: number
+        cycles:
+          type: integer
+          format: int32
+        dataSource:
+          type: string
+        isReconciled:
+          type: boolean
+        createdAt:
+          $ref: "#/components/schemas/LocalDateTime"
+    ForecastComparisonResponse:
+      type: object
+      properties:
+        baselineForecastId:
+          $ref: "#/components/schemas/UUID"
+        comparisonForecastId:
+          $ref: "#/components/schemas/UUID"
+        differences:
+          type: array
+          items:
+            $ref: "#/components/schemas/ForecastDifference"
+    ForecastDifference:
+      type: object
+      properties:
+        field:
+          type: string
+        baselineValue: {}
+        comparisonValue: {}
+        description:
+          type: string
+    ForecastGenerationRequest:
+      type: object
+      properties:
+        aircraftIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+        periodStart:
+          $ref: "#/components/schemas/LocalDate"
+        periodEnd:
+          $ref: "#/components/schemas/LocalDate"
+        confidenceLevel:
+          type: string
+    HangarBayResponse:
+      type: object
+      properties:
+        bayId:
+          $ref: "#/components/schemas/UUID"
+        bayNumber:
+          type: string
+        baySize:
+          type: string
+        currentStatus:
+          type: string
+        floorSpaceSqm:
+          type: number
+    HangarResponse:
+      type: object
+      properties:
+        hangarId:
+          $ref: "#/components/schemas/UUID"
+        hangarCode:
+          type: string
+        hangarName:
+          type: string
+        stationCode:
+          type: string
+        totalBays:
+          type: integer
+          format: int32
+        maxAircraftSize:
+          type: string
+        isActive:
+          type: boolean
+    HangarScheduleResponse:
+      type: object
+      properties:
+        hangarId:
+          $ref: "#/components/schemas/UUID"
+        hangarName:
+          type: string
+        bays:
+          type: array
+          items:
+            $ref: "#/components/schemas/BaySchedule"
+    HangarSlotReservationRequest:
+      type: object
+      required:
+      - bayId
+      - visitId
+      - slotStart
+      - slotEnd
+      properties:
+        bayId:
+          $ref: "#/components/schemas/UUID"
+        visitId:
+          $ref: "#/components/schemas/UUID"
+        slotStart:
+          $ref: "#/components/schemas/LocalDateTime"
+        slotEnd:
+          $ref: "#/components/schemas/LocalDateTime"
+        toolingAllocated:
+          type: string
+    HangarSlotResponse:
+      type: object
+      properties:
+        slotId:
+          $ref: "#/components/schemas/UUID"
+        bayNumber:
+          type: string
+        visitReference:
+          type: string
+        tailNumber:
+          type: string
+        slotStart:
+          $ref: "#/components/schemas/LocalDateTime"
+        slotEnd:
+          $ref: "#/components/schemas/LocalDateTime"
+        status:
+          type: string
+    InspectorSignOffRequest:
+      type: object
+      required:
+      - inspectorId
+      properties:
+        inspectorId:
+          $ref: "#/components/schemas/UUID"
+    Instant:
+      type: string
+      format: date-time
+      examples:
+      - 2022-03-10T16:15:50Z
+    InvestigationRequest:
+      type: object
+      properties:
+        assignedTo:
+          $ref: "#/components/schemas/UUID"
+        priority:
+          type: string
+    LLPReplacementForecastResponse:
+      type: object
+      properties:
+        llpId:
+          $ref: "#/components/schemas/UUID"
+        partNumber:
+          type: string
+        serialNumber:
+          type: string
+        currentFh:
+          type: number
+        currentFc:
+          type: integer
+          format: int32
+        lifeLimitFh:
+          type: number
+        lifeLimitFc:
+          type: integer
+          format: int32
+        projectedRemainingDays:
+          type: integer
+          format: int32
+        projectedRemainingFh:
+          type: number
+        projectedRemovalDate:
+          $ref: "#/components/schemas/LocalDate"
+        confidenceLevel:
+          type: string
+    LifeLimitedPartResponse:
+      type: object
+      properties:
+        llpId:
+          $ref: "#/components/schemas/UUID"
+        partNumber:
+          type: string
+        serialNumber:
+          type: string
+        partName:
+          type: string
+        componentCategory:
+          type: string
+        lifeLimitFh:
+          type: number
+        lifeLimitFc:
+          type: integer
+          format: int32
+        currentFh:
+          type: number
+        currentFc:
+          type: integer
+          format: int32
+        remainingFh:
+          type: number
+        remainingFc:
+          type: integer
+          format: int32
+        installedOnEngineId:
+          $ref: "#/components/schemas/UUID"
+        installationDate:
+          $ref: "#/components/schemas/LocalDate"
+        status:
+          type: string
+    LocalDate:
+      type: string
+      format: date
+      examples:
+      - 2022-03-10
+    LocalDateTime:
+      type: string
+      format: date-time
+      examples:
+      - 2022-03-10T12:15:50
+    LogbookAmendmentRequest:
+      type: object
+      required:
+      - amendedDescription
+      - reason
+      properties:
+        amendedDescription:
+          type: string
+        reason:
+          type: string
+    LogbookEntryRequest:
+      type: object
+      required:
+      - entryType
+      - description
+      properties:
+        entryType:
+          type: string
+        description:
+          type: string
+        flightHoursAtEntry:
+          type: number
+        cyclesAtEntry:
+          type: integer
+          format: int32
+        visitId:
+          $ref: "#/components/schemas/UUID"
+        taskCardId:
+          $ref: "#/components/schemas/UUID"
+        digitalSignature:
+          type: string
+    LogbookEntryResponse:
+      type: object
+      properties:
+        entryId:
+          $ref: "#/components/schemas/UUID"
+        entryReference:
+          type: string
+        entryDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        entryType:
+          type: string
+        description:
+          type: string
+        flightHoursAtEntry:
+          type: number
+        cyclesAtEntry:
+          type: integer
+          format: int32
+        enteredByName:
+          type: string
+        isAmended:
+          type: boolean
+        createdAt:
+          $ref: "#/components/schemas/LocalDateTime"
+    LogbookResponse:
+      type: object
+      properties:
+        logbookId:
+          $ref: "#/components/schemas/UUID"
+        logbookType:
+          type: string
+        logbookReference:
+          type: string
+        aircraftTailNumber:
+          type: string
+        engineSerial:
+          type: string
+        createdDate:
+          $ref: "#/components/schemas/LocalDate"
+        currentVolume:
+          type: integer
+          format: int32
+        isActive:
+          type: boolean
+        archived:
+          type: boolean
+    MaintenanceForecastResponse:
+      type: object
+      properties:
+        forecastId:
+          $ref: "#/components/schemas/UUID"
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        tailNumber:
+          type: string
+        forecastPeriodStart:
+          $ref: "#/components/schemas/LocalDate"
+        forecastPeriodEnd:
+          $ref: "#/components/schemas/LocalDate"
+        projectedFhPerDay:
+          type: number
+        projectedFcPerDay:
+          type: number
+        confidenceLevel:
+          type: string
+        generatedAt:
+          $ref: "#/components/schemas/LocalDateTime"
+    MaintenanceTaskResponse:
+      type: object
+      properties:
+        taskId:
+          $ref: "#/components/schemas/UUID"
+        taskReference:
+          type: string
+        taskDescription:
+          type: string
+        taskCategory:
+          type: string
+        skillRequired:
+          type: string
+        estimatedManHours:
+          type: number
+        sequenceOrder:
+          type: integer
+          format: int32
+    MaintenanceVisitDetailResponse:
+      type: object
+      properties:
+        visit:
+          $ref: "#/components/schemas/MaintenanceVisitResponse"
+        taskCards:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskCardResponse"
+    MaintenanceVisitResponse:
+      type: object
+      properties:
+        visitId:
+          $ref: "#/components/schemas/UUID"
+        visitReference:
+          type: string
+        aircraftId:
+          $ref: "#/components/schemas/UUID"
+        tailNumber:
+          type: string
+        checkType:
+          type: string
+        visitType:
+          type: string
+        status:
+          type: string
+        plannedStartDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        plannedEndDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        actualStartDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        actualEndDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        stationName:
+          type: string
+        totalEstimatedHours:
+          type: number
+        totalActualHours:
+          type: number
+        findingsCount:
+          type: integer
+          format: int32
+        createdAt:
+          $ref: "#/components/schemas/LocalDateTime"
+    MechanicQualificationResponse:
+      type: object
+      properties:
+        qualificationId:
+          $ref: "#/components/schemas/UUID"
+        licenseType:
+          type: string
+        licenseNumber:
+          type: string
+        issuingAuthority:
+          type: string
+        issueDate:
+          $ref: "#/components/schemas/LocalDate"
+        expiryDate:
+          $ref: "#/components/schemas/LocalDate"
+        aircraftTypeRating:
+          type: string
+        isActive:
+          type: boolean
+    MechanicResponse:
+      type: object
+      properties:
+        mechanicId:
+          $ref: "#/components/schemas/UUID"
+        employeeNumber:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        employmentStatus:
+          type: string
+        isCertifyingStaff:
+          type: boolean
+        homeStationCode:
+          type: string
+    PedigreeCertificateResponse:
+      type: object
+      properties:
+        componentId:
+          $ref: "#/components/schemas/UUID"
+        serialNumber:
+          type: string
+        partNumber:
+          type: string
+        pedigreeUrl:
+          type: string
+    PoolAllocationResponse:
+      type: object
+      properties:
+        allocationId:
+          $ref: "#/components/schemas/UUID"
+        partMasterId:
+          $ref: "#/components/schemas/UUID"
+        partNumber:
+          type: string
+        stationId:
+          $ref: "#/components/schemas/UUID"
+        stationCode:
+          type: string
+        minStockLevel:
+          type: integer
+          format: int32
+        maxStockLevel:
+          type: integer
+          format: int32
+        currentQuantity:
+          type: integer
+          format: int32
+        reorderPoint:
+          type: integer
+          format: int32
+        demandForecastMonthly:
+          type: number
+        lastRebalanceDate:
+          $ref: "#/components/schemas/LocalDate"
+    PoolRebalanceRequest:
+      type: object
+      properties:
+        stationIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+        partMasterIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+    QualificationExpiryResponse:
+      type: object
+      properties:
+        mechanicId:
+          $ref: "#/components/schemas/UUID"
+        mechanicName:
+          type: string
+        licenseType:
+          type: string
+        licenseNumber:
+          type: string
+        expiryDate:
+          $ref: "#/components/schemas/LocalDate"
+        daysUntilExpiry:
+          type: integer
+          format: int64
+    ReliabilityAlertResponse:
+      type: object
+      properties:
+        metricId:
+          $ref: "#/components/schemas/UUID"
+        metricType:
+          type: string
+        value:
+          type: number
+        thresholdValue:
+          type: number
+        alertSeverity:
+          type: string
+        investigationStatus:
+          type: string
+        componentCategory:
+          type: string
+        measurementPeriodEnd:
+          $ref: "#/components/schemas/LocalDate"
+    ReliabilityMetricResponse:
+      type: object
+      properties:
+        metricId:
+          $ref: "#/components/schemas/UUID"
+        metricType:
+          type: string
+        aircraftModelId:
+          $ref: "#/components/schemas/UUID"
+        componentCategory:
+          type: string
+        measurementPeriodStart:
+          $ref: "#/components/schemas/LocalDate"
+        measurementPeriodEnd:
+          $ref: "#/components/schemas/LocalDate"
+        value:
+          type: number
+        unit:
+          type: string
+        thresholdValue:
+          type: number
+        alertTriggered:
+          type: boolean
+        alertSeverity:
+          type: string
+        investigationStatus:
+          type: string
+        createdAt:
+          $ref: "#/components/schemas/LocalDateTime"
+    RepairOrderRequest:
+      type: object
+      required:
+      - componentId
+      - vendorId
+      - promisedTatDays
+      properties:
+        componentId:
+          $ref: "#/components/schemas/UUID"
+        vendorId:
+          $ref: "#/components/schemas/UUID"
+        issueDescription:
+          type: string
+        promisedTatDays:
+          type: integer
+          format: int32
+    RepairOrderResponse:
+      type: object
+      properties:
+        repairOrderId:
+          $ref: "#/components/schemas/UUID"
+        roNumber:
+          type: string
+        componentId:
+          $ref: "#/components/schemas/UUID"
+        vendorName:
+          type: string
+        status:
+          type: string
+        issueDescription:
+          type: string
+        quotedCost:
+          type: number
+        actualCost:
+          type: number
+        currency:
+          type: string
+        promisedTatDays:
+          type: integer
+          format: int32
+        actualTatDays:
+          type: integer
+          format: int32
+        receivedDate:
+          $ref: "#/components/schemas/LocalDate"
+        createdAt:
+          $ref: "#/components/schemas/LocalDateTime"
+    RepairOrderStatusResponse:
+      type: object
+      properties:
+        repairOrderId:
+          $ref: "#/components/schemas/UUID"
+        roNumber:
+          type: string
+        status:
+          type: string
+        vendorName:
+          type: string
+        sentDate:
+          $ref: "#/components/schemas/LocalDate"
+        promisedTatDays:
+          type: integer
+          format: int32
+        actualTatDays:
+          type: integer
+          format: int32
+        receivedDate:
+          $ref: "#/components/schemas/LocalDate"
+        completed:
+          type: boolean
+        daysLate:
+          type: integer
+          format: int32
+    RepairReceiptRequest:
+      type: object
+      properties:
+        receivedDate:
+          $ref: "#/components/schemas/LocalDate"
+        actualCost:
+          type: number
+        certificateRef:
+          type: string
+    RotableComponentDetailResponse:
+      type: object
+      properties:
+        component:
+          $ref: "#/components/schemas/RotableComponentResponse"
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentHistoryResponse"
+    RotableComponentResponse:
+      type: object
+      properties:
+        componentId:
+          $ref: "#/components/schemas/UUID"
+        partNumber:
+          type: string
+        partName:
+          type: string
+        serialNumber:
+          type: string
+        currentStatus:
+          type: string
+        currentLocationStation:
+          type: string
+        installedOnAircraftTail:
+          type: string
+        totalFlightHoursSinceNew:
+          type: number
+        totalCyclesSinceNew:
+          type: integer
+          format: int32
+        warrantyExpiryDate:
+          $ref: "#/components/schemas/LocalDate"
+        createdAt:
+          $ref: "#/components/schemas/LocalDateTime"
+    RoutingRecommendationResponse:
+      type: object
+      properties:
+        taskIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+        recommendedStation:
+          type: string
+        routeType:
+          type: string
+        reason:
+          type: string
+    ShelfLifeMaterialResponse:
+      type: object
+      properties:
+        materialId:
+          $ref: "#/components/schemas/UUID"
+        partNumber:
+          type: string
+        batchNumber:
+          type: string
+        manufactureDate:
+          $ref: "#/components/schemas/LocalDate"
+        expiryDate:
+          $ref: "#/components/schemas/LocalDate"
+        quantityOnHand:
+          type: number
+        unitOfMeasure:
+          type: string
+        storageLocation:
+          type: string
+        stationCode:
+          type: string
+        status:
+          type: string
+        daysUntilExpiry:
+          type: integer
+          format: int64
+    SlotReleaseRequest:
+      type: object
+      required:
+      - reason
+      properties:
+        reason:
+          type: string
+        releasedBy:
+          type: string
+    StationCapabilityResponse:
+      type: object
+      properties:
+        stationCode:
+          type: string
+        stationName:
+          type: string
+        stationType:
+          type: string
+        hasHangar:
+          type: boolean
+        lineCapabilityIds:
+          type: string
+    TaskCardAssignmentRequest:
+      type: object
+      required:
+      - mechanicId
+      properties:
+        mechanicId:
+          $ref: "#/components/schemas/UUID"
+    TaskCardCompletionRequest:
+      type: object
+      properties:
+        actualHours:
+          type: number
+        findingsDescription:
+          type: string
+        findingsCategory:
+          type: string
+    TaskCardDeferralRequest:
+      type: object
+      required:
+      - reason
+      properties:
+        reason:
+          type: string
+        deferredToVisitId:
+          $ref: "#/components/schemas/UUID"
+    TaskCardResponse:
+      type: object
+      properties:
+        taskCardId:
+          $ref: "#/components/schemas/UUID"
+        cardReference:
+          type: string
+        visitReference:
+          type: string
+        taskReference:
+          type: string
+        taskDescription:
+          type: string
+        status:
+          type: string
+        assignedMechanicName:
+          type: string
+        actualStartTime:
+          $ref: "#/components/schemas/LocalDateTime"
+        actualEndTime:
+          $ref: "#/components/schemas/LocalDateTime"
+        actualManHours:
+          type: number
+        findingsDescription:
+          type: string
+        findingsCategory:
+          type: string
+        signOffTimestamp:
+          $ref: "#/components/schemas/LocalDateTime"
+        inspectorName:
+          type: string
+        inspectorSignOff:
+          $ref: "#/components/schemas/LocalDateTime"
+    TraceabilityGapResponse:
+      type: object
+      properties:
+        componentId:
+          $ref: "#/components/schemas/UUID"
+        serialNumber:
+          type: string
+        gapStart:
+          $ref: "#/components/schemas/LocalDateTime"
+        gapEnd:
+          $ref: "#/components/schemas/LocalDateTime"
+        description:
+          type: string
+    UUID:
+      type: string
+      format: uuid
+      pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+    UtilizationAdjustmentRequest:
+      type: object
+      properties:
+        adjustmentValue:
+          type: number
+        reasonCode:
+          type: string
+        justification:
+          type: string
+    VendorPerformanceResponse:
+      type: object
+      properties:
+        vendorId:
+          $ref: "#/components/schemas/UUID"
+        vendorCode:
+          type: string
+        vendorName:
+          type: string
+        vendorType:
+          type: string
+        totalOrders:
+          type: integer
+          format: int32
+        completedOrders:
+          type: integer
+          format: int32
+        avgTatDays:
+          type: number
+          format: double
+        onTimeRate:
+          type: number
+          format: double
+        avgCost:
+          type: number
+    VisitCompletionRequest:
+      type: object
+      properties:
+        actualEndDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        findingsSummary:
+          type: string
+    VisitStartRequest:
+      type: object
+      properties:
+        actualStartDate:
+          $ref: "#/components/schemas/LocalDateTime"
+        assignedTeam:
+          type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Authentication

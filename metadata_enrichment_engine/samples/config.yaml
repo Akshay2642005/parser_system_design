@@ -1,0 +1,8 @@
+databases:
+  - id: clinic_db
+    type: postgresql
+    description: "Primary clinic management database"
+
+  - id: hr_db
+    type: mysql
+    description: "Human resources database"

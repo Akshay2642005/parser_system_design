@@ -1,0 +1,60 @@
+{
+  "databases": [
+    {
+      "database_info": {
+        "name": "clinic_db",
+        "type": "postgresql"
+      },
+      "tables": [
+        {
+          "name": "patients",
+          "columns": [
+            {"name": "patient_id", "type": "INTEGER", "nullable": false, "primary_key": true},
+            {"name": "first_name", "type": "VARCHAR(100)", "nullable": false},
+            {"name": "last_name", "type": "VARCHAR(100)", "nullable": false},
+            {"name": "email", "type": "VARCHAR(255)", "nullable": true},
+            {"name": "phone", "type": "VARCHAR(15)", "nullable": true},
+            {"name": "dob", "type": "DATE", "nullable": true},
+            {"name": "address", "type": "TEXT", "nullable": true},
+            {"name": "created_at", "type": "TIMESTAMP", "nullable": false},
+            {"name": "updated_at", "type": "TIMESTAMP", "nullable": true}
+          ],
+          "primary_keys": ["patient_id"]
+        }
+      ],
+      "domains": [
+        {"domain": "Healthcare", "confidence": 0.83}
+      ],
+      "business_glossary": [
+        {"term": "Patients", "definition": "Individual receiving healthcare services"},
+        {"term": "Patient Id", "definition": "Unique identifier for the record"},
+        {"term": "First Name", "definition": "Attribute of the patient entity"},
+        {"term": "Email", "definition": "Email address for electronic communication"}
+      ],
+      "classifications": [
+        {"column": "email", "table": "patients", "classification": "PII", "reason": "Email address is personally identifiable information"},
+        {"column": "phone", "table": "patients", "classification": "PII", "reason": "Phone number is personally identifiable information"},
+        {"column": "dob", "table": "patients", "classification": "PII", "reason": "Date of birth is personally identifiable information"}
+      ],
+      "use_cases": [
+        {"name": "Patient Registration", "description": "Register new patients"},
+        {"name": "Patient Search", "description": "Search patients by name, phone, or email"},
+        {"name": "Appointment Scheduling", "description": "Book and manage patient appointments"}
+      ],
+      "business_processes": [
+        {
+          "process": "Patient Care Lifecycle",
+          "description": "End-to-end patient care from registration through treatment",
+          "tables_involved": ["patients", "appointments", "doctors", "prescriptions", "diagnosis"]
+        }
+      ],
+      "alerts": [
+        {"severity": "HIGH", "message": "Table 'patients' contains PII/PHI field 'email' but no masking policy metadata exists", "table": "patients", "column": "email"}
+      ],
+      "recommendations": [
+        "Address 1 HIGH severity alert(s) immediately.",
+        "Review 8 PII/PHI classified columns for masking and access control."
+      ]
+    }
+  ]
+}
